@@ -7,7 +7,9 @@ plugins {
 android {
     namespace = "com.example.task_tracker_oridj"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion = flutter.ndkVersion
+    // NDK не нужен: нативного кода в проекте нет. Раскомментировать, если
+    // появится плагин с C/C++ (тогда NDK скачается, это ~1 ГБ).
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
