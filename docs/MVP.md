@@ -316,7 +316,7 @@ AI является одной из запланированных возмож�
 
 Предполагаемая архитектура:
 
-`Flutter → REST API / MCP → AI Agent → Gemma → Arij API → PostgreSQL`
+`Flutter Client` ──[ Prompt + JWT ]──> `AI Microservice (Gemma + MCP)` ──[ REST API + JWT ]──> `Arij Main Backend` ──> `PostgreSQL`
 
 Сначала необходимо сделать стабильными базу данных и REST API. После этого интеграция AI будет проще, поскольку агент сможет использовать уже готовые операции системы.
 
