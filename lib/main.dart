@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// --- Главная функция приложения ---
 void main() {
   runApp(const MyApp());
 }
@@ -7,116 +8,231 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Task Tracker',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true, // Используем Material 3 для современного вида
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.deepPurple,
+          foregroundColor: Colors.white,
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const TaskTrackerHomePage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+// --- Основная страница трекера задач (с боковым меню) ---
+class TaskTrackerHomePage extends StatefulWidget {
+  const TaskTrackerHomePage({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<TaskTrackerHomePage> createState() => _TaskTrackerHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+class _TaskTrackerHomePageState extends State<TaskTrackerHomePage> {
+  // Отслеживаем текущий активный раздел (для демонстрации работы меню)
+  String _selectedSection = 'Планируемые функции';
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Task Tracker Oridj'),
+        elevation: 0,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have 1234 to pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      body: Row(
+        children: <Widget>[
+          // 1. Боковое меню навигации (Sidebar)
+          _buildSidebar(),
+          // Разделитель между меню и контентом
+          const VerticalDivider(thickness: 1),
+          // 2. Основная область контента
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildContentArea(),
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 250, // Фиксированная ширина боковой панели
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Меню', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 30),
+          // Элементы меню
+          _buildMenuItem(
+            '📊 Дашборд',
+            () {
+              setState(() {
+                _selectedSection = 'Дашборд';
+              });
+            },
+          ),
+          const SizedBox(height: 10),
+          _buildMenuItem(
+            '➕ Создать задачу',
+            () {
+              setState(() {
+                _selectedSection = 'Создание задачи';
+              });
+            },
+          ),
+          const SizedBox(height: 10),
+          _buildMenuItem(
+            '📚 Проекты',
+            () {
+              setState(() {
+                _selectedSection = 'Проекты';
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          // Разделитель для секции планов
+          const Divider(),
+          const SizedBox(height: 10),
+          Text('Функционал', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          _buildMenuItem(
+            '💡 Планы развития (Текущее)',
+            () {
+              setState(() {
+                _selectedSection = 'Планируемые функции';
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Вспомогательная функция для создания элемента меню
+  Widget _buildMenuItem(String title, VoidCallback onTap) {
+    final isSelected = (_selectedSection == title.split(' ')[0]); // Простая логика выбора
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300)
+        ),
+        child: Text(title, style: TextStyle(fontSize: 16, color: isSelected ? Theme.of(context).colorScheme.primary : Colors.black)),
+      ),
+    );
+  }
+
+  // Виджет для отображения контента в основной области
+  Widget _buildContentArea() {
+    if (_selectedSection == 'Планируемые функции') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('📄 Планируемые функции (Roadmap)', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Text("Цель: Расширить функционал для поддержки сложных командных процессов и отчетности.", style: TextStyle(fontSize: 16, color: Colors.grey[700])),
+          const Divider(),
+          Expanded(
+            child: ListView(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Настройка проектов (досок) с независимыми типами задач и статусами', style: TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ),
+                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Настраиваемые обязательные/необязательные поля для задач', style: TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ),
+                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Фильтрация и поиск задач', style: TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ),
+                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Детализированные отчеты и графики', style: TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ),
+                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Ролевая модель доступа (администратор, руководитель, исполнитель, наблюдатель)', style: TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ),
+                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Создавать/редактировать задачи с помощью агента', style: TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ),
+                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Получать статистику по задачам с помощью агента', style: TextStyle(fontSize: 16))),
+                    ],
+                  ),
+                ),
+                 Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (val) {}),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text('Просто общение с агентом <3', style: TextStyle(fontSize: 16, color: Colors.blue))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    // Здесь будет логика для отображения контента других разделов (Дашборд, Проекты и т.д.)
+    return const Center(child: Text('Содержимое раздела будет добавлено позже.', style: TextStyle(fontSize: 20)));
   }
 }
