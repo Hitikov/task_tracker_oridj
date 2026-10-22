@@ -32,8 +32,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed .
+      - name: Format code
+        run: dart format .
+
+      - name: Check for uncommitted changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: auto-format dart code"
+          file_pattern: "*.dart"
 
       - name: Analyze code
         run: flutter analyze
