@@ -30,7 +30,7 @@ jobs:
           cache-key: "os:-flutter:-v1:pubspec-hash:${{ hashFiles('**/pubspec.lock') }}"
 
       - name: Install dependencies
-        run: flutter pub get --offline
+        run: flutter pub get
 
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed .
