@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-// Импортируем Drift и драйвер для работы с SQLite (скрываем Column, чтобы не конфликтовал с Flutter)
-import 'package:drift/drift.dart' hide Column;
+// Импортируем драйвер для работы с SQLite
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
