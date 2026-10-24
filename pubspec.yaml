@@ -26,3 +26,7 @@ dev_dependencies:
   drift_dev: ^2.0.0 # Генератор кода для работы с БД (Обязательно!)
   build_runner: ^2.4.8 # Инструмент для запуска генератора кода (Обязательно!)
   flutter_lints: ^6.0.0
+
+flutter:
+  # Подключает шрифт Material Icons (без этого иконки отображаются квадратами).
+  uses-material-design: true
