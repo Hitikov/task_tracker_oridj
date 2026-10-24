@@ -1,12 +1,37 @@
 import 'package:flutter/material.dart';
+// Импортируем Drift и драйвер для работы с SQLite (скрываем Column, чтобы не конфликтовал с Flutter)
+import 'package:drift/drift.dart' hide Column;
+import 'package:drift/native.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'dart:io';
 
-// --- Главная функция приложения ---
-void main() {
-  runApp(const MyApp());
+// Импортируем слои приложения
+import 'database/app_database.dart';
+import 'repositories/person_repository.dart';
+import 'api/person_controller.dart';
+
+void main() async {
+  // Убедимся, что связующие механизмы Flutter инициализированы
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 1. Инициализируем подключение к базе данных Drift (файловая БД SQLite)
+  final dbFolder = await getApplicationDocumentsDirectory();
+  final file = File(p.join(dbFolder.path, 'db.sqlite'));
+  final db = AppDatabase(NativeDatabase(file));
+
+  // 2. Создаем репозиторий и контроллер, передавая базу через Dependency Injection
+  final personRepository = PersonRepository(db);
+  final personController = PersonController(personRepository);
+
+  // Запускаем приложение, передавая контроллер в корневой виджет
+  runApp(MyApp(personController: personController));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final PersonController personController;
+
+  const MyApp({super.key, required this.personController});
 
   @override
   Widget build(BuildContext context) {
@@ -14,225 +39,208 @@ class MyApp extends StatelessWidget {
       title: 'Task Tracker',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true, // Используем Material 3 для современного вида
-        appBarTheme: AppBarTheme(
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
           backgroundColor: Colors.deepPurple,
           foregroundColor: Colors.white,
         ),
       ),
-      home: const TaskTrackerHomePage(),
+      home: TaskDemoPage(personController: personController),
     );
   }
 }
 
-// --- Основная страница трекера задач (с боковым меню) ---
-class TaskTrackerHomePage extends StatefulWidget {
-  const TaskTrackerHomePage({super.key});
+class TaskDemoPage extends StatefulWidget {
+  final PersonController personController;
+
+  const TaskDemoPage({super.key, required this.personController});
 
   @override
-  State<TaskTrackerHomePage> createState() => _TaskTrackerHomePageState();
+  State<TaskDemoPage> createState() => _TaskDemoPageState();
 }
 
-class _TaskTrackerHomePageState extends State<TaskTrackerHomePage> {
-  // Отслеживаем текущий активный раздел (для демонстрации работы меню)
-  String _selectedSection = 'Планируемые функции';
+class _TaskDemoPageState extends State<TaskDemoPage> {
+  String _statusMessage =
+      "Готов к работе с данными. Нажмите 'Run Demo' для запуска CRUD-цикла.";
+
+  // Используем PersonModel, сгенерированный Drift
+  List<PersonModel> _peopleList = [];
+
+  // --- Демонстрация полного цикла CRUD ---
+  Future<void> runDemo() async {
+    setState(() {
+      _statusMessage = "Запуск демо... (1/4: Добавление пользователя)";
+      _peopleList.clear();
+    });
+
+    try {
+      // 1. CREATE (Добавить)
+      final newUser =
+          await widget.personController.createPerson('Михаил Сидоров');
+      setState(() {
+        _statusMessage = "Успех: Пользователь ${newUser.name} добавлен.";
+      });
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // 2. READ (Получить список)
+      setState(() {
+        _statusMessage =
+            "Загрузка данных... (2/4: Получение списка пользователей)";
+      });
+      final peopleList = await widget.personController.getPeople();
+      setState(() {
+        _peopleList = peopleList;
+        _statusMessage =
+            "Успех: Загружено ${_peopleList.length} пользователей.";
+      });
+
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (_peopleList.isNotEmpty) {
+        // Берем первого пользователя для редактирования
+        final personToUpdateId = _peopleList[0].id;
+
+        // 3. UPDATE (Обновить)
+        setState(() {
+          _statusMessage = "Изменение данных... (3/4: Обновление)";
+        });
+        await widget.personController
+            .updatePerson(personToUpdateId, 'Михаил Сидоров - Обновлено');
+
+        // Снова получаем список после обновления для подтверждения
+        final refreshedPeopleList = await widget.personController.getPeople();
+        setState(() {
+          _peopleList = refreshedPeopleList;
+          _statusMessage =
+              "Успех: Пользователь обновлен и список синхронизирован.";
+        });
+
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // 4. DELETE (Удалить)
+        // Проверяем, есть ли хотя бы 2 пользователя, чтобы не получить RangeError
+        if (_peopleList.length >= 2) {
+          final idToDelete = _peopleList[1].id;
+          setState(() {
+            _statusMessage = "Удаление данных... (4/4: Удаление)";
+          });
+
+          await widget.personController.deletePerson(idToDelete);
+
+          // Финальная загрузка, исключая удаленного
+          final finalPeopleList = await widget.personController.getPeople();
+          setState(() {
+            _peopleList = finalPeopleList;
+            _statusMessage = "✅ Демо завершено! Пользователь успешно удален.";
+          });
+        } else {
+          setState(() {
+            _statusMessage =
+                "✅ Демо завершено! (Меньше 2 пользователей для удаления)";
+          });
+        }
+      } else {
+        setState(() {
+          _statusMessage =
+              "Не удалось запустить цикл демо: Не получено ни одного пользователя.";
+        });
+      }
+    } catch (e) {
+      // Обработка ошибок API или БД
+      setState(() {
+        _statusMessage = "❌ ОШИБКА при выполнении CRUD-цикла: ${e.toString()}";
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Task Tracker Oridj'),
+        title: const Text('Task Tracker Backend Demo'),
         elevation: 0,
       ),
-      body: Row(
-        children: <Widget>[
-          // 1. Боковое меню навигации (Sidebar)
-          _buildSidebar(),
-          // Разделитель между меню и контентом
-          const VerticalDivider(thickness: 1),
-          // 2. Основная область контента
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: _buildContentArea(),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Кнопка запуска демо
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: runDemo,
+                icon: const Text('▶️'),
+                label: const Text('Запустить CRUD-демо (Проверка связи с БД)'),
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 30),
 
-  Widget _buildSidebar() {
-    return Container(
-      width: 250, // Фиксированная ширина боковой панели
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Меню', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 30),
-          // Элементы меню
-          _buildMenuItem(
-            '📊 Дашборд',
-            () {
-              setState(() {
-                _selectedSection = 'Дашборд';
-              });
-            },
-          ),
-          const SizedBox(height: 10),
-          _buildMenuItem(
-            '➕ Создать задачу',
-            () {
-              setState(() {
-                _selectedSection = 'Создание задачи';
-              });
-            },
-          ),
-          const SizedBox(height: 10),
-          _buildMenuItem(
-            '📚 Проекты',
-            () {
-              setState(() {
-                _selectedSection = 'Проекты';
-              });
-            },
-          ),
-          const SizedBox(height: 20),
-          // Разделитель для секции планов
-          const Divider(),
-          const SizedBox(height: 10),
-          Text('Функционал', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          _buildMenuItem(
-            '💡 Планы развития (Текущее)',
-            () {
-              setState(() {
-                _selectedSection = 'Планируемые функции';
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
+            // Статус выполнения операций (Логирование)
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Текущий статус работы:',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Divider(),
+                    Text(_statusMessage,
+                        style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
 
-  // Вспомогательная функция для создания элемента меню
-  Widget _buildMenuItem(String title, VoidCallback onTap) {
-    final isSelected = (_selectedSection == title.split(' ')[0]); // Простая логика выбора
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade300)
+            const SizedBox(height: 30),
+
+            // Секция "Список пользователей" (Результат READ)
+            const Text('Текущий список пользователей в БД:',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Divider(),
+
+            if (_peopleList.isEmpty)
+              const Center(
+                  child: Padding(
+                      padding: EdgeInsets.all(50),
+                      child: Text(
+                          "Список пуст. Запустите демо для добавления данных.")))
+            else
+              Column(
+                children: _peopleList.map((person) {
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Имя: ${person.name}',
+                                  style: const TextStyle(fontSize: 18)),
+                              const SizedBox(height: 4),
+                              Text('ID: ${person.id.substring(0, 8)}...',
+                                  style: const TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
         ),
-        child: Text(title, style: TextStyle(fontSize: 16, color: isSelected ? Theme.of(context).colorScheme.primary : Colors.black)),
       ),
     );
-  }
-
-  // Виджет для отображения контента в основной области
-  Widget _buildContentArea() {
-    if (_selectedSection == 'Планируемые функции') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('📄 Планируемые функции (Roadmap)', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          Text("Цель: Расширить функционал для поддержки сложных командных процессов и отчетности.", style: TextStyle(fontSize: 16, color: Colors.grey[700])),
-          const Divider(),
-          Expanded(
-            child: ListView(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Настройка проектов (досок) с независимыми типами задач и статусами', style: TextStyle(fontSize: 16))),
-                    ],
-                  ),
-                ),
-                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Настраиваемые обязательные/необязательные поля для задач', style: TextStyle(fontSize: 16))),
-                    ],
-                  ),
-                ),
-                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Фильтрация и поиск задач', style: TextStyle(fontSize: 16))),
-                    ],
-                  ),
-                ),
-                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Детализированные отчеты и графики', style: TextStyle(fontSize: 16))),
-                    ],
-                  ),
-                ),
-                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Ролевая модель доступа (администратор, руководитель, исполнитель, наблюдатель)', style: TextStyle(fontSize: 16))),
-                    ],
-                  ),
-                ),
-                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Создавать/редактировать задачи с помощью агента', style: TextStyle(fontSize: 16))),
-                    ],
-                  ),
-                ),
-                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Получать статистику по задачам с помощью агента', style: TextStyle(fontSize: 16))),
-                    ],
-                  ),
-                ),
-                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Checkbox(value: false, onChanged: (val) {}),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('Просто общение с агентом <3', style: TextStyle(fontSize: 16, color: Colors.blue))),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-    // Здесь будет логика для отображения контента других разделов (Дашборд, Проекты и т.д.)
-    return const Center(child: Text('Содержимое раздела будет добавлено позже.', style: TextStyle(fontSize: 20)));
   }
 }
