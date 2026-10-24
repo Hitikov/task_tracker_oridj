@@ -21,7 +21,7 @@ class Person extends Table {
 @DriftDatabase(tables: [Person])
 class AppDatabase extends _$AppDatabase {
   // Конструктор, принимающий QueryExecutor (реальное подключение к БД)
-  AppDatabase(QueryExecutor e) : super(e);
+  AppDatabase(super.e);
 
   // Версия схемы базы данных (обязательна для миграций)
   @override

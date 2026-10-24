@@ -1,5 +1,3 @@
-import 'package:uuid/uuid.dart';
-
 class Person {
   final String id; // UUID (Primary Key)
   String name; // VARCHAR(255) - Имя пользователя
