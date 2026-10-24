@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Существующий тег для публикации (например, v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Опубликовать как pre-release'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.47.6'
+  APP_NAME: task_tracker_oridj
+
+jobs:
+  build-windows:
+    name: Build Windows release
+    runs-on: windows-latest
+    timeout-minutes: 40
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Resolve and validate version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag || github.ref_name }}"
+          $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*([^+\s]+)' | Select-Object -First 1
+          if (-not $line) {
+            throw "Не удалось прочитать version из pubspec.yaml"
+          }
+          $version = $line.Matches[0].Groups[1].Value
+          if ("v$version" -ne $tag) {
+            throw "Тег '$tag' не совпадает с версией 'v$version' из pubspec.yaml. Обновите version перед созданием тега."
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Run tests
+        run: flutter test --reporter expanded
+
+      - name: Build Windows release
+        run: >
+          flutter build windows --release
+          --build-name=${{ steps.version.outputs.version }}
+          --build-number=${{ github.run_number }}
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $dist = "dist"
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          $zipName = "${{ env.APP_NAME }}-${{ steps.version.outputs.version }}-windows-x64.zip"
+          $zipPath = Join-Path $dist $zipName
+          Compress-Archive `
+            -Path "build/windows/x64/runner/Release/*" `
+            -DestinationPath $zipPath `
+            -Force
+          $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zipName" | Set-Content -Path (Join-Path $dist "SHA256SUMS.txt") -Encoding ascii
+          Get-ChildItem $dist | Select-Object Name, Length
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-release
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.build-windows.outputs.tag }}
+          name: Arij ${{ needs.build-windows.outputs.tag }}
+          body: |
+            ## Arij ${{ needs.build-windows.outputs.version }}
+
+            Сборка приложения для Windows (x64).
+
+            ### Установка
+
+            1. Скачайте `task_tracker_oridj-${{ needs.build-windows.outputs.version }}-windows-x64.zip` и распакуйте в любую папку.
+            2. Запустите `task_tracker_oridj.exe`.
+            3. Для демо-входа используйте логин `12345` и пароль `12345`.
+
+            ### Проверка целостности
+
+            Сверьте SHA-256 архива с файлом `SHA256SUMS.txt`.
+
+            > Сборка не подписана. Windows SmartScreen может показать предупреждение — выберите «Подробнее» → «Выполнить в любом случае».
+
+            ### Демо работы с БД
+
+            Для раздела «Демо работы с БД» рядом с `task_tracker_oridj.exe` нужен файл `.env`
+            с параметрами подключения к PostgreSQL. В релизный архив он не включается.
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease || false }}
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
