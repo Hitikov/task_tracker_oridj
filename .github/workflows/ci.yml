@@ -16,10 +16,12 @@ permissions:
 
 env:
   FLUTTER_VERSION: '3.47.6'
+  APP_NAME: task_tracker_oridj
 
 jobs:
-  quality:
-    name: Format, analyze and test
+  # Этап 1. Статический анализ.
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -43,12 +45,143 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
-      - name: Run tests
-        run: flutter test --reporter expanded
+  # Этап 2. Тесты.
+  test:
+    name: Test
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test --reporter expanded --coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Этап 3a. Сборка Android: APK для установки и AAB для Google Play.
+  build-android:
+    name: Build Android (APK + AAB)
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Read app version
+        id: version
+        run: |
+          version=$(sed -n 's/^version:[[:space:]]*\([^+ ]*\).*/\1/p' pubspec.yaml | head -n 1)
+          if [ -z "$version" ]; then
+            echo "::error::Не удалось прочитать version из pubspec.yaml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "Release keystore не задан: APK и AAB будут подписаны debug-ключом."
+            echo "ANDROID_SIGNING=debug" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || [ -z "${ANDROID_KEY_ALIAS:-}" ] || [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "::error::Для release-подписи нужны все секреты: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD."
+            exit 1
+          fi
+
+          keystore_path="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          {
+            echo "storeFile=$keystore_path"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > android/key.properties
+          echo "ANDROID_SIGNING=release" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Build AAB
+        run: flutter build appbundle --release
+
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          version="${{ steps.version.outputs.version }}"
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "dist/${APP_NAME}-${version}-android.apk"
+          cp build/app/outputs/bundle/release/app-release.aab \
+            "dist/${APP_NAME}-${version}-android.aab"
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-release
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # Этап 3b. Сборка Windows x64. Выполняется параллельно с Android.
   build-windows:
-    name: Build Windows (release)
-    needs: quality
+    name: Build Windows (x64)
+    needs: test
     runs-on: windows-latest
     timeout-minutes: 40
 
@@ -66,6 +199,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Read app version
+        id: version
+        shell: pwsh
+        run: |
+          $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*([^+\s]+)' | Select-Object -First 1
+          if (-not $line) {
+            throw "Не удалось прочитать version из pubspec.yaml"
+          }
+          "version=$($line.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
+
       - name: Build Windows release
         run: flutter build windows --release
 
@@ -73,15 +216,21 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $version = "${{ steps.version.outputs.version }}"
+          $name = "${env:APP_NAME}-${version}-windows-x64.zip"
+          $path = Join-Path "dist" $name
           Compress-Archive `
             -Path "build/windows/x64/runner/Release/*" `
-            -DestinationPath "dist/task_tracker_oridj-windows-x64.zip" `
+            -DestinationPath $path `
             -Force
+          $hash = (Get-FileHash -Path $path -Algorithm SHA256).Hash.ToLower()
+          "$hash  $name" | Set-Content -Path "dist/SHA256SUMS.txt" -Encoding ascii
+          Get-ChildItem dist | Select-Object Name, Length
 
-      - name: Upload artifact
+      - name: Upload Windows artifact
         uses: actions/upload-artifact@v7
         with:
-          name: task_tracker_oridj-windows-x64
-          path: dist/task_tracker_oridj-windows-x64.zip
+          name: windows-release
+          path: dist/*
           if-no-files-found: error
           retention-days: 14

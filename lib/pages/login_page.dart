@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/person_controller.dart';
+import '../auth/demo_auth.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 
@@ -18,10 +19,6 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  /// Демо-учётные данные, пока нет серверной авторизации.
-  static const String _demoLogin = '12345';
-  static const String _demoPassword = '12345';
-
   final TextEditingController _loginController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -55,16 +52,20 @@ class _LoginPageState extends State<LoginPage> {
 
   void _onSubmit() {
     final login = _loginController.text.trim();
-    final password = _passwordController.text;
+    final status = checkDemoCredentials(
+      login: login,
+      password: _passwordController.text,
+    );
 
-    if (login.isEmpty || password.isEmpty) {
-      setState(() => _authError = 'Введите логин и пароль');
-      return;
-    }
-
-    if (login != _demoLogin || password != _demoPassword) {
-      setState(() => _authError = 'Неверный логин или пароль');
-      return;
+    switch (status) {
+      case DemoAuthStatus.emptyFields:
+        setState(() => _authError = 'Введите логин и пароль');
+        return;
+      case DemoAuthStatus.invalidCredentials:
+        setState(() => _authError = 'Неверный логин или пароль');
+        return;
+      case DemoAuthStatus.success:
+        break;
     }
 
     // TODO(backend): заменить на реальный запрос авторизации.
@@ -188,7 +189,7 @@ class _LoginPageState extends State<LoginPage> {
                   _AuthErrorBanner(message: _authError),
                   const SizedBox(height: 8),
                   Text(
-                    'Демо-вход: логин и пароль — 12345.',
+                    'Демо-вход: логин и пароль — $demoLogin.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
