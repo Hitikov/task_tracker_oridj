@@ -1,0 +1,11 @@
+# Пример конфигурации release-подписи.
+#
+# Скопируйте файл в android/key.properties и заполните значения.
+# Сам key.properties и файлы *.jks / *.keystore добавлены в .gitignore.
+#
+# storeFile — путь к keystore относительно android/app или абсолютный путь.
+# В Windows используйте прямые слэши: C:/keys/release.jks
+storeFile=release.jks
+storePassword=change-me
+keyAlias=release
+keyPassword=change-me

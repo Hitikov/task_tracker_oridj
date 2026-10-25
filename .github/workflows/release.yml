@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Существующий тег для публикации (например, v1.0.0)'
+        description: 'Существующий тег для публикации (например, v1.1.0)'
         required: true
         type: string
       prerelease:
@@ -28,10 +28,11 @@ env:
   APP_NAME: task_tracker_oridj
 
 jobs:
-  build-windows:
-    name: Build Windows release
-    runs-on: windows-latest
-    timeout-minutes: 40
+  # Этап 1. Статический анализ и проверка версии.
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
@@ -52,47 +53,200 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze code
+        run: flutter analyze
+
       - name: Resolve and validate version
         id: version
-        shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          $tag = "${{ inputs.tag || github.ref_name }}"
-          $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*([^+\s]+)' | Select-Object -First 1
-          if (-not $line) {
-            throw "Не удалось прочитать version из pubspec.yaml"
-          }
-          $version = $line.Matches[0].Groups[1].Value
-          if ("v$version" -ne $tag) {
-            throw "Тег '$tag' не совпадает с версией 'v$version' из pubspec.yaml. Обновите version перед созданием тега."
-          }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-          "version=$version" >> $env:GITHUB_OUTPUT
+          tag="$REQUESTED_TAG"
+          version=$(sed -n 's/^version:[[:space:]]*\([^+ ]*\).*/\1/p' pubspec.yaml | head -n 1)
+          if [ -z "$version" ]; then
+            echo "::error::Не удалось прочитать version из pubspec.yaml"
+            exit 1
+          fi
+          if [ "v$version" != "$tag" ]; then
+            echo "::error::Тег '$tag' не совпадает с версией 'v$version' из pubspec.yaml. Обновите version перед созданием тега."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # Этап 2. Тесты.
+  test:
+    name: Test
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
 
       - name: Run tests
-        run: flutter test --reporter expanded
+        run: flutter test --reporter expanded --coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Этап 3a. Сборка Android: APK для установки и AAB для Google Play.
+  build-android:
+    name: Build Android (APK + AAB)
+    needs:
+      - lint
+      - test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "Release keystore не задан: APK и AAB будут подписаны debug-ключом."
+            echo "ANDROID_SIGNING=debug" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || [ -z "${ANDROID_KEY_ALIAS:-}" ] || [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "::error::Для release-подписи нужны все секреты: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD."
+            exit 1
+          fi
+
+          keystore_path="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          {
+            echo "storeFile=$keystore_path"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > android/key.properties
+          echo "ANDROID_SIGNING=release" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Build AAB
+        run: flutter build appbundle --release
+
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          version="${{ needs.lint.outputs.version }}"
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "dist/${APP_NAME}-${version}-android.apk"
+          cp build/app/outputs/bundle/release/app-release.aab \
+            "dist/${APP_NAME}-${version}-android.aab"
+          ls -lh dist
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-release
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # Этап 3b. Сборка Windows x64. Выполняется параллельно с Android.
+  build-windows:
+    name: Build Windows (x64)
+    needs:
+      - lint
+      - test
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
 
       - name: Build Windows release
-        run: >
-          flutter build windows --release
-          --build-name=${{ steps.version.outputs.version }}
-          --build-number=${{ github.run_number }}
+        run: flutter build windows --release
 
       - name: Package release
         shell: pwsh
         run: |
           $dist = "dist"
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
-          $zipName = "${{ env.APP_NAME }}-${{ steps.version.outputs.version }}-windows-x64.zip"
+          $version = "${{ needs.lint.outputs.version }}"
+          $zipName = "${env:APP_NAME}-${version}-windows-x64.zip"
           $zipPath = Join-Path $dist $zipName
           Compress-Archive `
             -Path "build/windows/x64/runner/Release/*" `
             -DestinationPath $zipPath `
             -Force
-          $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zipName" | Set-Content -Path (Join-Path $dist "SHA256SUMS.txt") -Encoding ascii
           Get-ChildItem $dist | Select-Object Name, Length
 
-      - name: Upload release artifact
+      - name: Upload Windows artifact
         uses: actions/upload-artifact@v7
         with:
           name: windows-release
@@ -100,42 +254,74 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  publish:
-    name: Publish GitHub Release
-    needs: build-windows
+  # Этап 4. Публикация GitHub Release с общими контрольными суммами.
+  deploy:
+    name: Deploy GitHub Release
+    needs:
+      - lint
+      - build-android
+      - build-windows
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
 
     steps:
-      - name: Download release artifact
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: android-release
+          path: dist
+
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v8
         with:
           name: windows-release
           path: dist
 
+      - name: Build checksums
+        run: |
+          cd dist
+          rm -f SHA256SUMS.txt
+          sha256sum *.apk *.aab *.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ needs.build-windows.outputs.tag }}
-          name: Arij ${{ needs.build-windows.outputs.tag }}
+          tag_name: ${{ needs.lint.outputs.tag }}
+          name: Arij ${{ needs.lint.outputs.tag }}
           body: |
-            ## Arij ${{ needs.build-windows.outputs.version }}
+            ## Arij ${{ needs.lint.outputs.version }}
 
-            Сборка приложения для Windows (x64).
+            Сборки для Android и Windows (x64).
 
-            ### Установка
+            ### Android
 
-            1. Скачайте `task_tracker_oridj-${{ needs.build-windows.outputs.version }}-windows-x64.zip` и распакуйте в любую папку.
+            - `task_tracker_oridj-${{ needs.lint.outputs.version }}-android.apk` — установка на устройство:
+              `adb install task_tracker_oridj-${{ needs.lint.outputs.version }}-android.apk`.
+              Также можно перенести APK на телефон и открыть, разрешив установку из неизвестных источников.
+            - `task_tracker_oridj-${{ needs.lint.outputs.version }}-android.aab` — формат для загрузки в Google Play Console.
+
+            APK и AAB подписаны release-ключом, если в репозитории настроены секреты
+            `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
+            и `ANDROID_KEY_PASSWORD`. Без них используется debug-подпись: такая сборка
+            устанавливается вручную, но не подходит для публикации в Google Play.
+
+            ### Windows
+
+            1. Скачайте `task_tracker_oridj-${{ needs.lint.outputs.version }}-windows-x64.zip` и распакуйте в любую папку.
             2. Запустите `task_tracker_oridj.exe`.
-            3. Для демо-входа используйте логин `12345` и пароль `12345`.
+
+            > Сборка не подписана. Windows SmartScreen может показать предупреждение — выберите «Подробнее» → «Выполнить в любом случае».
+
+            ### Демо-вход
+
+            Логин `12345`, пароль `12345`. Остальные данные отклоняются.
 
             ### Проверка целостности
 
-            Сверьте SHA-256 архива с файлом `SHA256SUMS.txt`.
-
-            > Сборка не подписана. Windows SmartScreen может показать предупреждение — выберите «Подробнее» → «Выполнить в любом случае».
+            Сверьте SHA-256 файлов с `SHA256SUMS.txt`.
 
             ### Демо работы с БД
 
@@ -144,6 +330,8 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ inputs.prerelease || false }}
           files: |
+            dist/*.apk
+            dist/*.aab
             dist/*.zip
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
