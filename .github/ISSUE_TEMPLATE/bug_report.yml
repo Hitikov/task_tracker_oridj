@@ -1,0 +1,49 @@
+name: Сообщение об ошибке
+description: Расскажите, что пошло не так
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Что произошло
+      description: Опишите ошибку и фактическое поведение.
+      placeholder: При запуске приложения...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      description: Как повторить ошибку?
+      placeholder: |
+        1. Запустить приложение
+        2. Открыть...
+        3. Нажать...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+      description: Что должно было произойти?
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Окружение
+      description: ОС, версия Flutter/Dart, устройство или браузер.
+      placeholder: Windows 11, Flutter 3.47.6, Dart 3.13.5
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверки
+      options:
+        - label: Я проверил(а), что такого issue ещё нет
+          required: true
+        - label: Я приложил(а) логи или скриншоты

@@ -1,0 +1,41 @@
+name: Предложение функции
+description: Предложите новую возможность или улучшение
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Что произошло
+      description: Опишите текущую ситуацию или ограничение.
+      placeholder: Сейчас нельзя...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      description: Как сейчас приходится действовать пользователю?
+      placeholder: |
+        1. Открыть...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+      description: Как должно работать после доработки?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверки
+      options:
+        - label: Я проверил(а), что такого предложения ещё нет
+          required: true
+        - label: Предложение соответствует scope MVP (см. docs/MVP.md)
