@@ -176,6 +176,7 @@ jobs:
     needs:
       - lint
       - test
+      - backend
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -269,6 +270,7 @@ jobs:
     needs:
       - lint
       - test
+      - backend
     runs-on: windows-latest
     timeout-minutes: 40
 
