@@ -77,10 +77,69 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Этап 2b. Проверка серверного пакета server/ (format, analyze, test).
+  # Пока пакета нет, job проходит без проверок: сервер появится в отдельной ветке.
+  backend:
+    name: Backend lint & test
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Detect server package
+        id: server
+        run: |
+          if [ -f server/pubspec.yaml ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Пакет server/ ещё не добавлен — проверка backend пропущена."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Dart
+        if: steps.server.outputs.exists == 'true'
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.13.5'
+
+      - name: Cache pub dependencies
+        if: steps.server.outputs.exists == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: server-${{ runner.os }}-${{ hashFiles('server/pubspec.lock') }}
+          restore-keys: |
+            server-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.server.outputs.exists == 'true'
+        working-directory: server
+        run: dart pub get
+
+      - name: Check formatting
+        if: steps.server.outputs.exists == 'true'
+        working-directory: server
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze code
+        if: steps.server.outputs.exists == 'true'
+        working-directory: server
+        run: dart analyze
+
+      - name: Run tests
+        if: steps.server.outputs.exists == 'true'
+        working-directory: server
+        run: dart test
+
   # Этап 3a. Сборка Android: APK для установки и AAB для Google Play.
   build-android:
     name: Build Android (APK + AAB)
-    needs: test
+    needs:
+      - test
+      - backend
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -181,7 +240,9 @@ jobs:
   # Этап 3b. Сборка Windows x64. Выполняется параллельно с Android.
   build-windows:
     name: Build Windows (x64)
-    needs: test
+    needs:
+      - test
+      - backend
     runs-on: windows-latest
     timeout-minutes: 40
 
