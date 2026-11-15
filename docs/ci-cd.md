@@ -196,7 +196,7 @@ flutter build windows --release
 
 По умолчанию используются GitHub-hosted runners (`ubuntu-latest` и
 `windows-latest`). Если нужен собственный runner (см.
-`how-to_self-host-runner`), замените в workflow `runs-on` на свои метки,
+[`docs/self-hosted-runner.md`](self-hosted-runner.md)), замените в workflow `runs-on` на свои метки,
 например:
 
 ```yaml
