@@ -18,6 +18,9 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    # Отдельный Dart-пакет со своим analysis_options.yaml и pubspec.lock;
+    # проверяется job'ом backend в CI.
+    - server/**
 
 linter:
   # The lint rules applied to this project can be customized in the
