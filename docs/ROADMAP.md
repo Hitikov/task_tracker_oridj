@@ -36,7 +36,7 @@
 | Этап | Ветка | Срок | Результат | Статус |
 |---|---|---|---|---|
 | 0. Фундамент | `feature/stage-0-foundation` | 16–21 ноября | чистый репозиторий, ADR, OpenAPI, `server/`, Docker, backend CI | завершён |
-| 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | запланирован |
+| 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | в работе |
 | 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | запланирован |
 | 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | запланирован |
 | 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | запланирован |
@@ -300,3 +300,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 15.11.2026 | 0 | создан план, запущены 5 агентов | `feature/stage-0-foundation` |
 | 21.11.2026 | 0 | влиты все 5 потоков: гигиена, ADR/OpenAPI, `server/`, Docker, CI; проверки зелёные | `feature/stage-0-foundation`, PR #19 |
 | 21.11.2026 | 0 | этап 0 влит в `main`; архитектура дополнена картой текущего кода и целевым клиентским слоем | `main` (`cdd8cc2`), PR #19 |
+| 21.11.2026 | 1 | создана ветка `feature/stage-1-auth-projects`, начаты миграции и слой БД | `feature/stage-1-auth-projects` |
