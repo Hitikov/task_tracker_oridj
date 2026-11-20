@@ -13,11 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   uuid: ^4.3.0
   path_provider: ^2.1.2  # <--- Вот этот пакет нужен для поиска папки с БД
-  dotenv: ^4.2.0 # Для загрузки переменных окружения из .env файла
-  drift: ^2.0.0   # ORM для работы с БД (Сложно, но надежно)
-  postgres: ^2.0.0 # PostgreSQL драйвер для Drift/Dart
-  shelf: ^1.3.0   # HTTP-серверный фреймворк
-  shelf_router: ^1.1.2 # Для маршрутизации API в Shelf
+  drift: ^2.0.0   # Локальный кэш клиента (SQLite)
   path: ^1.9.1
 
 dev_dependencies:

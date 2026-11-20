@@ -1,0 +1,9 @@
+.dart_tool/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+.git/
+test/
+README.md
