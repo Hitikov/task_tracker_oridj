@@ -299,3 +299,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 |---|---|---|---|
 | 15.11.2026 | 0 | создан план, запущены 5 агентов | `feature/stage-0-foundation` |
 | 21.11.2026 | 0 | влиты все 5 потоков: гигиена, ADR/OpenAPI, `server/`, Docker, CI; проверки зелёные | `feature/stage-0-foundation`, PR #19 |
+| 21.11.2026 | 0 | этап 0 влит в `main`; архитектура дополнена картой текущего кода и целевым клиентским слоем | `main` (`cdd8cc2`), PR #19 |
