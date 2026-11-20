@@ -53,11 +53,11 @@ Drift на клиенте — **только локальный кэш**. Он �
 
 | Сервис | Сборка/образ | Порты | Назначение |
 |---|---|---|---|
-| `db` | `postgres:16` | `5432` (только dev) | PostgreSQL, именованный volume для данных |
-| `server` | `./server` (Dockerfile) | `8080` | Dart-сервер `arij_server`, применяет миграции при старте |
+| `postgres` | `postgres:16` | `5432` (только dev) | PostgreSQL, именованный volume `arij_pgdata` |
+| `server` | `./server` (Dockerfile) | `8080` | Dart-сервер `arij_server`; миграции — с этапа 1 |
 | `nginx` | `nginx:alpine` | `80`/`443` | Flutter Web и reverse proxy, **этап 5** |
 
-`docker compose up` поднимает `db` и `server`. Сервер ждёт готовности PostgreSQL
+`docker compose up` поднимает `postgres` и `server`. Сервер ждёт готовности PostgreSQL
 (healthcheck) и применяет миграции; в dev клиент ходит напрямую на
 `http://localhost:8080`. Nginx добавляется на этапе 5, когда появляется Web-сборка:
 он раздаёт статику и проксирует `/api/v1` и `/health` на сервер. Наружу публикуется
@@ -304,3 +304,78 @@ server/
 `.env` (шаблон — `.env.example`). Клиент ходит на `http://localhost:8080`, базовый URL
 задаётся через `--dart-define=API_BASE_URL`. Nginx добавляется на этапе релиза, когда
 появляется Flutter Web.
+
+## 9. Текущая кодовая база (`main`)
+
+Состояние на 21.11.2026 по дереву GitHub: UI-оболочка с демо-входом и локальным CRUD,
+реального API и серверной авторизации пока нет.
+
+| Путь | Назначение | Судьба |
+|---|---|---|
+| `lib/main.dart` | точка входа `runApp` | сохраняется |
+| `lib/app/arij_app.dart`, `lib/app/theme.dart` | `MaterialApp`, тема | сохраняется |
+| `lib/auth/demo_auth.dart` | демо-вход `12345/12345` | заменяется реальным auth (этап 1), демо — за флагом |
+| `lib/database/app_database.dart` (+ `.g.dart`) | Drift/SQLite, таблица `Person` | остаётся локальным кэшем, сущности заменяются на API-модели |
+| `lib/models/person.dart` | локальная модель `Person` | заменяется моделями API |
+| `lib/repositories/person_repository.dart` | локальный CRUD | заменяется репозиториями домена |
+| `lib/api/person_controller.dart` | контроллер поверх репозитория | переоформляется под API |
+| `lib/pages/login_page.dart`, `register_page.dart`, `home_page.dart`, `db_demo_page.dart` | экраны | переписываются под реальный API |
+| `lib/widgets/app_sidebar.dart`, `roadmap_view.dart`, `section_placeholder.dart` | навигация и заглушки разделов | сохраняются, наполняются на этапах 1–4 |
+| `test/` | `demo_auth_test`, `person_controller_test`, `widget_test` — 26 тестов | тесты обновляются вместе с кодом |
+
+Итог: клиент сейчас однослойный (`экран → контроллер → репозиторий → Drift`). Этап 1
+добавляет API-слой, управление состоянием сессии и реальную авторизацию.
+
+## 10. Клиентская архитектура (целевая)
+
+```mermaid
+flowchart TB
+    UI["pages / widgets<br/>Flutter"] --> ST["state<br/>Riverpod или Bloc"]
+    ST --> REPO["repositories<br/>контракты домена"]
+    REPO --> API["ApiClient<br/>dio + JWT"]
+    REPO --> CACHE[("Drift / SQLite<br/>локальный кэш")]
+    API -->|"REST /api/v1"| SRV["Arij Server"]
+```
+
+Правила:
+
+1. UI не знает ни об HTTP, ни о БД: только state и доменные модели.
+2. Управление состоянием — один подход: Riverpod (предпочтительно) или Bloc.
+   Выбирается на этапе 1 и не смешивается.
+3. `ApiClient` на `dio`: базовый URL через `--dart-define=API_BASE_URL`,
+   перехватчик `Authorization: Bearer`, единый разбор конверта ошибок, выход при `401`.
+4. Токен — только `flutter_secure_storage`; не хранить в `SharedPreferences`.
+5. Drift — только кэш: запись через API, чтение из кэша при недоступности сервера.
+   Схема кэша не обязана совпадать с серверной.
+6. Модели клиента отражают схемы API; маппинг DTO ↔ домен — в репозиториях.
+7. Пользователю показываются доменные ошибки; технические детали — в лог.
+
+## 11. Поверхность API
+
+| Этап | Маршруты |
+|---|---|
+| 0 | `GET /health` |
+| 1 | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`; `GET/POST /projects`; `GET/PATCH/DELETE /projects/{id}`; `GET/POST /projects/{id}/members`; `DELETE /projects/{id}/members/{userId}` |
+| 2 | `GET/POST /projects/{id}/tasks`; `GET/PATCH/DELETE /tasks/{id}`; фильтры бэклога |
+| 3 | смена статуса `PATCH /tasks/{id}/status`; данные для Kanban |
+| 5 | веб-сборка за Nginx, `/api/v1` → сервер |
+
+Контракт — источник истины: изменение начинается с [OpenAPI](api/openapi.yaml),
+затем реализуется на сервере и клиенте.
+
+## 12. Развёртывание и релизы
+
+- **CI:** GitHub Actions (self-hosted runner), jobs `lint → test → build-android +
+  build-windows`, отдельный job `backend` (`dart format/analyze/test`).
+- **Release:** тег `v*` → APK + AAB + Windows zip + `SHA256SUMS.txt`.
+- **Этап 5:** Flutter Web за Nginx с HTTPS; Nginx проксирует `/api/v1` и `/health`
+  на сервер. Порт PostgreSQL наружу не публикуется.
+- **Конфигурация:** `.env` не коммитится, в репозитории — `.env.example`; секреты
+  только в окружении или секрет-менеджере.
+
+## 13. Источники контекста
+
+- Дерево репозитория GitHub на `main` (клиент, тесты, workflows).
+- `README.md`, [MVP](MVP.md), [USER_STORY](USER_STORY.md), [ROADMAP](ROADMAP.md).
+- Issues: #3 (эпик backend), #5–#9, #11, #13–#15.
+- [ADR-0001](adr/0001-backend-stack.md) и [OpenAPI](api/openapi.yaml).

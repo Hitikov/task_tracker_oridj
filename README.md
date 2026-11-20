@@ -1,8 +1,10 @@
 # Arij — трекер задач для командной работы
 
-> **Статус:** backend находится в разработке (этапы 0–1). Пока приложение
-> работает в демо-режиме: вход `12345/12345`, данные хранятся локально на
-> клиенте. Актуальный план — в [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Статус:** фундамент готов (этап 0): ADR, OpenAPI, каркас сервера `server/`,
+> Docker Compose с PostgreSQL и backend CI. Идёт этап 1 — реальная авторизация,
+> проекты и данные в PostgreSQL. Пока приложение запускается в демо-режиме:
+> вход `12345/12345`, данные хранятся локально на клиенте.
+> Актуальный план — в [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Описание проекта
 
@@ -113,9 +115,18 @@ flutter run -d windows
 
 Демо-вход: логин `12345`, пароль `12345`.
 
-> Backend пока не подключён: приложение запускается в демо-режиме и хранит
-> данные локально. Запуск сервера и PostgreSQL появится после этапа 0 — следите
-> за [docs/ROADMAP.md](docs/ROADMAP.md).
+### Backend и PostgreSQL
+
+```powershell
+Copy-Item .env.example .env   # затем задайте JWT_SECRET
+./scripts/dev-up.ps1           # docker compose up -d --build + ожидание /health
+```
+
+Сервер отвечает на <http://localhost:8080/health>. Подробности — в
+[docs/local-dev.md](docs/local-dev.md). Миграции и схема БД появятся на этапе 1.
+
+> Backend пока не подключён к клиенту: приложение запускается в демо-режиме и
+> хранит данные локально. Следите за [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Структура репозитория
 
@@ -130,7 +141,11 @@ docs/                документация: ROADMAP, MVP, CI/CD, архите
 ## Документация
 
 - [План развития проекта (ROADMAP)](docs/ROADMAP.md)
+- [Архитектура](docs/architecture.md)
+- [ADR-0001: серверный стек](docs/adr/0001-backend-stack.md)
+- [OpenAPI 3.1](docs/api/openapi.yaml)
 - [MVP и MoSCoW-приоритеты](docs/MVP.md)
+- [Локальный запуск (Docker)](docs/local-dev.md)
 - [CI/CD и релизы](docs/ci-cd.md)
 - [Self-hosted runner](docs/self-hosted-runner.md)
 - [Как внести вклад в проект](CONTRIBUTING.md)
