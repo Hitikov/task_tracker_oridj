@@ -1,0 +1,75 @@
+# Arij — локальная инфраструктура для разработки.
+#
+# Все значения берутся из .env (шаблон — .env.example). Файл .env обязателен:
+# без него `docker compose up` завершится ошибкой. .env не коммитится.
+#
+# Запуск:    docker compose up -d --build
+# Остановка: docker compose down
+#
+# Секреты (DB_PASSWORD, JWT_SECRET) намеренно не имеют значений по умолчанию.
+
+name: arij
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: arij-postgres
+    environment:
+      POSTGRES_DB: "${DB_NAME:?DB_NAME не задан. Скопируйте .env.example в .env}"
+      POSTGRES_USER: "${DB_USER:?DB_USER не задан. Скопируйте .env.example в .env}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD не задан. Скопируйте .env.example в .env и задайте пароль}"
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - arij_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:?DB_USER не задан} -d ${DB_NAME:?DB_NAME не задан}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  server:
+    build:
+      # Контекст — каталог server/: Dockerfile копирует pubspec.yaml, bin/ и lib/
+      # относительно него. Путь server/Dockerfile при context: . сломал бы COPY.
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: arij-server
+    env_file:
+      - .env
+    environment:
+      # Внутри compose-сети сервер всегда слушает 0.0.0.0:8080 и ходит в postgres:5432,
+      # независимо от SERVER_HOST/DB_HOST/DB_PORT из .env (см. docs/local-dev.md).
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: "${DB_NAME:?DB_NAME не задан. Скопируйте .env.example в .env}"
+      DB_USER: "${DB_USER:?DB_USER не задан. Скопируйте .env.example в .env}"
+      DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD не задан. Скопируйте .env.example в .env и задайте пароль}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET не задан. Скопируйте .env.example в .env и задайте секрет не короче 32 символов}"
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # curl есть в runtime-образе server/Dockerfile.
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  # Явное имя, чтобы данные переживали пересоздание проекта и их можно было
+  # удалить через `docker volume rm arij_pgdata` / scripts/db-reset.ps1.
+  arij_pgdata:
+    name: arij_pgdata
+
+networks:
+  default:
+    name: arij_network
