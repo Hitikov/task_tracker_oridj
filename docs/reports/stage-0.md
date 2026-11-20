@@ -4,7 +4,7 @@
 - **Ветка:** `feature/stage-0-foundation`
 - **PR:** [#19](https://github.com/Hitikov/task_tracker_oridj/pull/19)
 - **План:** [ROADMAP](../ROADMAP.md)
-- **Статус:** завершён, готов к мержу в `main`
+- **Статус:** завершён, влит в `main` (`cdd8cc2`, PR #19)
 
 ## Итог
 
