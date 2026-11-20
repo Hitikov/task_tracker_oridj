@@ -52,17 +52,25 @@ Worktree: `C:\Users\Andre\.local\share\opencode\worktree\7601ed\stage-1-db`
 
 Изменено: `server/Dockerfile`, `server/README.md`, `server/bin/server.dart`.
 
-**Внимание:** в том же worktree изменены клиентские файлы `lib/**` и `test/**`
-(`theme.dart`, `demo_auth.dart`, `app_database.dart`, `person.dart`, страницы,
-виджеты, тесты). Скорее всего это побочный эффект форматирования. Перед коммитом
-их нужно проверить и при необходимости откатить: в этап 1 они не входят.
+Агент случайно запустил `dart format` из корня worktree и переписал клиентские
+файлы, но сразу выполнил `git restore lib test`. На момент остановки `git status`
+показывает изменения **только в `server/`**, клиент не затронут.
 
-Агент получил команду остановиться и больше ничего не менять.
+Агент остановлен по команде, коммиты и пуш не выполнялись.
+
+### Проверки, уже выполненные агентом
+
+- `dart pub get` — OK
+- `dart format --set-exit-if-changed .` в `server/` — 1 файл отформатирован
+- `dart analyze` — без замечаний
+- `dart test` — все тесты зелёные, 1 skipped (интеграционный тест без БД)
+- `git diff --check` — exit 0
+
+Не проверено: синтаксис SQL парсером, живые миграции в PostgreSQL, коммиты и пуш.
 
 ## Следующие шаги после возобновления
 
-1. Проверить uncommitted-изменения в `stage-1-db`, откатить клиентские файлы.
-2. Оставить только `server/`, прогнать `dart format/analyze/test`, закоммитить и запушить `agent/stage-1-db`.
-3. На живой БД: `docker compose up -d --build`, `GET /health`, `psql` → `\dt`, `schema_migrations`, `\d users/projects/project_members`, проверка частичного уникального индекса owner, `compose restart server` на идемпотентность, затем `compose down -v`.
-4. Проверить ветку в GitHub и влить в `feature/stage-1-auth-projects`.
-5. Запустить потоки `auth` → `projects` → `client` → `ci` (PostgreSQL service в CI).
+1. Проверить uncommitted-изменения в `stage-1-db` (только `server/`), закоммитить 2–3 коммита и запушить `agent/stage-1-db`.
+2. На живой БД: `docker compose up -d --build`, `GET /health`, `psql` → `\dt`, `schema_migrations`, `\d users/projects/project_members`, проверка частичного уникального индекса owner, `compose restart server` на идемпотентность, затем `compose down -v`.
+3. Проверить ветку в GitHub и влить в `feature/stage-1-auth-projects`.
+4. Запустить потоки `auth` → `projects` → `client` → `ci` (PostgreSQL service в CI).
