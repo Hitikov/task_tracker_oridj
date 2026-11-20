@@ -1,0 +1,1010 @@
+openapi: 3.1.0
+
+info:
+  title: Arij API
+  version: 0.1.0
+  summary: REST API трекера задач Arij
+  description: |
+    Контракт REST API сервера Arij. Источник истины для клиента и сервера:
+    реализация этапа 1 должна соответствовать этому файлу.
+
+    ## Формат ошибок
+
+    Любая ошибка возвращается в едином конверте:
+
+    ```json
+    {
+      "error": {
+        "code": "validation_error",
+        "message": "Некорректные данные запроса",
+        "details": { "field": "email" }
+      }
+    }
+    ```
+
+    `code` — машиночитаемый код в snake_case, `message` — человекочитаемое
+    сообщение, `details` — объект с дополнительным контекстом или `null`.
+    HTTP-статус выбирается по смыслу ошибки, а не всегда 200.
+
+    ## Аутентификация
+
+    Защищённые операции требуют заголовок `Authorization: Bearer <JWT>`.
+    Токен выдаётся `POST /api/v1/auth/register` и `POST /api/v1/auth/login`.
+    Публичные операции: `GET /health`, регистрация и вход.
+
+    ## Версионирование
+
+    Прикладные операции находятся под `/api/v1`. `GET /health` намеренно
+    расположен в корне, чтобы проверки контейнера не зависели от версии API.
+
+    ## Задачи
+
+    Задачи, Backlog и Kanban появятся на этапе 2. Схемы `Task`, `TaskCreate`
+    и `TaskUpdate` в эту версию контракта не входят.
+
+    ## Документы
+
+    - [ADR-0001: серверный стек](../adr/0001-backend-stack.md)
+    - [Архитектура](../architecture.md)
+    - [ROADMAP](../ROADMAP.md)
+  contact:
+    name: Arij
+    url: https://github.com/Hitikov/task_tracker_oridj
+
+servers:
+  - url: http://localhost:8080
+    description: Локальная разработка (Docker Compose или dart run)
+
+tags:
+  - name: Health
+    description: Проверка доступности сервера
+  - name: Auth
+    description: Регистрация, вход и текущий пользователь
+  - name: Projects
+    description: Проекты и доступ пользователя к ним
+  - name: Members
+    description: Участники проекта
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Проверка живости сервера
+      description: |
+        Публичный endpoint для health-check Docker и мониторинга.
+        Не требует аутентификации и не обращается к бизнес-логике.
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Сервер работает
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              examples:
+                ok:
+                  summary: Штатный ответ
+                  value:
+                    status: ok
+                    service: arij-server
+                    version: 0.1.0
+                    time: '2026-11-15T12:00:00.000Z'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Регистрация пользователя
+      description: |
+        Создаёт пользователя и сразу возвращает JWT, чтобы клиент не делал
+        отдельный вход после регистрации. Email уникален без учёта регистра.
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+            examples:
+              register:
+                summary: Регистрация нового пользователя
+                value:
+                  email: ada@example.com
+                  password: correct-horse-battery-staple
+                  name: Ада Лавлейс
+      responses:
+        '201':
+          description: Пользователь создан, выдан JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                created:
+                  summary: Успешная регистрация
+                  value:
+                    token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzZmE4NWY2NC01NzE3LTQ1NjItYjNmYy0yYzk2M2Y2NmFmYTYiLCJleHAiOjE3NjMyOTA0MDB9.example-signature
+                    tokenType: Bearer
+                    expiresIn: 86400
+                    user:
+                      id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      email: ada@example.com
+                      name: Ада Лавлейс
+                      createdAt: '2026-11-15T12:00:00.000Z'
+                      updatedAt: '2026-11-15T12:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email уже занят
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                emailTaken:
+                  summary: Пользователь с таким email уже существует
+                  value:
+                    error:
+                      code: email_taken
+                      message: Пользователь с таким email уже существует
+                      details:
+                        field: email
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Вход по email и паролю
+      description: Проверяет пароль и выдаёт новый JWT.
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+            examples:
+              login:
+                summary: Вход существующего пользователя
+                value:
+                  email: ada@example.com
+                  password: correct-horse-battery-staple
+      responses:
+        '200':
+          description: Вход выполнен, выдан JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                loggedIn:
+                  summary: Успешный вход
+                  value:
+                    token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzZmE4NWY2NC01NzE3LTQ1NjItYjNmYy0yYzk2M2Y2NmFmYTYiLCJleHAiOjE3NjMyOTA0MDB9.example-signature
+                    tokenType: Bearer
+                    expiresIn: 86400
+                    user:
+                      id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      email: ada@example.com
+                      name: Ада Лавлейс
+                      createdAt: '2026-11-15T12:00:00.000Z'
+                      updatedAt: '2026-11-15T12:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidCredentials:
+                  summary: Учётные данные не подошли
+                  value:
+                    error:
+                      code: invalid_credentials
+                      message: Неверный email или пароль
+                      details: null
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Текущий пользователь
+      description: Возвращает пользователя, которому принадлежит переданный JWT.
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Текущий пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              examples:
+                me:
+                  summary: Профиль текущего пользователя
+                  value:
+                    id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    email: ada@example.com
+                    name: Ада Лавлейс
+                    createdAt: '2026-11-15T12:00:00.000Z'
+                    updatedAt: '2026-11-15T12:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects:
+    get:
+      tags: [Projects]
+      summary: Проекты текущего пользователя
+      description: |
+        Возвращает проекты, в которых пользователь является владельцем или
+        участником. Сортировка — по `updatedAt` (сначала изменённые недавно).
+        Пагинация в MVP не предусмотрена.
+      operationId: listProjects
+      responses:
+        '200':
+          description: Список проектов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+              examples:
+                projects:
+                  summary: Два доступных проекта
+                  value:
+                    - id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      key: ARIJ
+                      name: Arij MVP
+                      description: Трекер задач для учебного проекта
+                      ownerId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      createdAt: '2026-11-15T12:00:00.000Z'
+                      updatedAt: '2026-11-15T12:00:00.000Z'
+                    - id: d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70
+                      key: DEMO
+                      name: Демо-проект
+                      description: null
+                      ownerId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                      createdAt: '2026-11-14T09:30:00.000Z'
+                      updatedAt: '2026-11-14T09:30:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Projects]
+      summary: Создать проект
+      description: |
+        Создаёт проект, делает текущего пользователя владельцем и добавляет его
+        в `project_members` с ролью `owner`. Ключ проекта уникален глобально и
+        в дальнейшем не меняется — он используется в номерах задач (`ARIJ-1`).
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+            examples:
+              create:
+                summary: Новый проект
+                value:
+                  key: ARIJ
+                  name: Arij MVP
+                  description: Трекер задач для учебного проекта
+      responses:
+        '201':
+          description: Проект создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+              examples:
+                created:
+                  summary: Созданный проект
+                  value:
+                    id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                    key: ARIJ
+                    name: Arij MVP
+                    description: Трекер задач для учебного проекта
+                    ownerId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    createdAt: '2026-11-15T12:00:00.000Z'
+                    updatedAt: '2026-11-15T12:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Ключ проекта уже занят
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                projectKeyTaken:
+                  summary: Проект с таким ключом уже существует
+                  value:
+                    error:
+                      code: project_key_taken
+                      message: Проект с таким ключом уже существует
+                      details:
+                        field: key
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      summary: Проект по идентификатору
+      description: Доступен владельцу и участникам проекта.
+      operationId: getProject
+      responses:
+        '200':
+          description: Проект
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+              examples:
+                project:
+                  summary: Карточка проекта
+                  value:
+                    id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                    key: ARIJ
+                    name: Arij MVP
+                    description: Трекер задач для учебного проекта
+                    ownerId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    createdAt: '2026-11-15T12:00:00.000Z'
+                    updatedAt: '2026-11-15T12:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [Projects]
+      summary: Обновить проект
+      description: |
+        Частичное обновление. Менять можно `name` и `description`; `key`
+        неизменяем. Доступно только владельцу проекта.
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+            examples:
+              rename:
+                summary: Переименование и новое описание
+                value:
+                  name: Arij MVP 2.0
+                  description: Трекер задач с Kanban
+      responses:
+        '200':
+          description: Проект обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+              examples:
+                updated:
+                  summary: Обновлённый проект
+                  value:
+                    id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                    key: ARIJ
+                    name: Arij MVP 2.0
+                    description: Трекер задач с Kanban
+                    ownerId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    createdAt: '2026-11-15T12:00:00.000Z'
+                    updatedAt: '2026-11-15T13:45:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Projects]
+      summary: Удалить проект
+      description: |
+        Удаляет проект и связанных участников. Доступно только владельцу.
+        Задачи на этапе 2 будут удаляться каскадно вместе с проектом.
+      operationId: deleteProject
+      responses:
+        '204':
+          description: Проект удалён
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{id}/members:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Members]
+      summary: Участники проекта
+      description: Доступно владельцу и участникам проекта.
+      operationId: listProjectMembers
+      responses:
+        '200':
+          description: Список участников
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectMember'
+              examples:
+                members:
+                  summary: Владелец и участник
+                  value:
+                    - userId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      email: ada@example.com
+                      name: Ада Лавлейс
+                      role: owner
+                      joinedAt: '2026-11-15T12:00:00.000Z'
+                    - userId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                      email: member@example.com
+                      name: Иван Петров
+                      role: member
+                      joinedAt: '2026-11-15T12:30:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Members]
+      summary: Добавить участника
+      description: |
+        Добавляет существующего пользователя в проект по email. Доступно только
+        владельцу. Повторное добавление возвращает `409 member_exists`.
+      operationId: addProjectMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberAdd'
+            examples:
+              addMember:
+                summary: Добавление участника
+                value:
+                  email: member@example.com
+      responses:
+        '201':
+          description: Участник добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMember'
+              examples:
+                added:
+                  summary: Новый участник проекта
+                  value:
+                    userId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                    email: member@example.com
+                    name: Иван Петров
+                    role: member
+                    joinedAt: '2026-11-15T12:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Проект или пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                projectNotFound:
+                  summary: Проект не найден
+                  value:
+                    error:
+                      code: project_not_found
+                      message: Проект не найден
+                      details:
+                        resource: project
+                        id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                userNotFound:
+                  summary: Пользователь с таким email не зарегистрирован
+                  value:
+                    error:
+                      code: user_not_found
+                      message: Пользователь не найден
+                      details:
+                        field: email
+                        email: member@example.com
+        '409':
+          description: Пользователь уже участвует в проекте
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                memberExists:
+                  summary: Повторное добавление
+                  value:
+                    error:
+                      code: member_exists
+                      message: Пользователь уже участвует в проекте
+                      details:
+                        userId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{id}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      tags: [Members]
+      summary: Удалить участника
+      description: |
+        Удаляет участника из проекта. Доступно только владельцу. Владельца
+        удалить нельзя — сначала нужно передать владение (post-MVP).
+      operationId: removeProjectMember
+      responses:
+        '204':
+          description: Участник удалён
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Проект или участник не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                projectNotFound:
+                  summary: Проект не найден
+                  value:
+                    error:
+                      code: project_not_found
+                      message: Проект не найден
+                      details:
+                        resource: project
+                        id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                memberNotFound:
+                  summary: Участник не найден
+                  value:
+                    error:
+                      code: member_not_found
+                      message: Участник не найден
+                      details:
+                        resource: project_member
+                        userId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+        '409':
+          description: Нельзя удалить владельца проекта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                ownerRemovalForbidden:
+                  summary: Попытка удалить владельца
+                  value:
+                    error:
+                      code: owner_removal_forbidden
+                      message: Нельзя удалить владельца проекта
+                      details:
+                        userId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # TODO(этап 2): задачи, Backlog и Kanban.
+  # Будущие пути (не входят в версию 0.1.0):
+  #   /api/v1/projects/{id}/tasks
+  #   /api/v1/projects/{id}/tasks/{taskId}
+  #   /api/v1/projects/{id}/task-types
+  #   /api/v1/projects/{id}/statuses
+  # Схемы Task, TaskCreate, TaskUpdate добавить вместе с task_kind/task_type.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT, выданный `POST /api/v1/auth/register` или `POST /api/v1/auth/login`.
+        Передаётся как `Authorization: Bearer <token>`.
+
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      description: UUID проекта
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: UUID пользователя-участника
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Некорректные данные запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            validationError:
+              summary: Ошибка валидации поля
+              value:
+                error:
+                  code: validation_error
+                  message: Некорректные данные запроса
+                  details:
+                    field: email
+    Unauthorized:
+      description: Аутентификация не пройдена
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            unauthorized:
+              summary: JWT отсутствует, просрочен или неверен
+              value:
+                error:
+                  code: unauthorized
+                  message: Требуется аутентификация
+                  details: null
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            forbidden:
+              summary: Операция недоступна роли пользователя
+              value:
+                error:
+                  code: forbidden
+                  message: Недостаточно прав для выполнения операции
+                  details:
+                    requiredRole: owner
+    ProjectNotFound:
+      description: Проект не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            projectNotFound:
+              summary: Проект отсутствует или недоступен
+              value:
+                error:
+                  code: project_not_found
+                  message: Проект не найден
+                  details:
+                    resource: project
+                    id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+    InternalError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            internalError:
+              summary: Непредвиденная ошибка
+              value:
+                error:
+                  code: internal_error
+                  message: Внутренняя ошибка сервера
+                  details: null
+
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetails'
+      examples:
+        - error:
+            code: validation_error
+            message: Некорректные данные запроса
+            details:
+              field: email
+
+    ErrorDetails:
+      type: object
+      additionalProperties: false
+      required: [code, message, details]
+      properties:
+        code:
+          type: string
+          description: |
+            Машиночитаемый код ошибки в snake_case. Примеры:
+            `validation_error`, `unauthorized`, `invalid_credentials`,
+            `forbidden`, `project_not_found`, `member_not_found`,
+            `user_not_found`, `email_taken`, `project_key_taken`,
+            `member_exists`, `owner_removal_forbidden`, `internal_error`.
+          examples:
+            - validation_error
+        message:
+          type: string
+          description: Человекочитаемое сообщение, пригодное для показа пользователю
+          examples:
+            - Некорректные данные запроса
+        details:
+          type: [object, 'null']
+          description: |
+            Дополнительный контекст: имя поля, идентификатор ресурса и т. п.
+            Если контекста нет — `null`. Не содержит секретов и stack trace.
+          additionalProperties: true
+          examples:
+            - field: email
+
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, service, version, time]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          description: Состояние сервера
+          examples:
+            - ok
+        service:
+          type: string
+          description: Имя сервиса
+          examples:
+            - arij-server
+        version:
+          type: string
+          description: Версия API
+          pattern: '^\d+\.\d+\.\d+$'
+          examples:
+            - 0.1.0
+        time:
+          type: string
+          format: date-time
+          description: Текущее время сервера в UTC (ISO 8601)
+          examples:
+            - '2026-11-15T12:00:00.000Z'
+
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, email, name, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    AuthRegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          description: Уникальный email, регистр не учитывается
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 8
+          maxLength: 128
+          description: Пароль в открытом виде только в запросе; хранится как Argon2id/bcrypt-хэш
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Отображаемое имя пользователя
+
+    AuthLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+
+    AuthResponse:
+      type: object
+      additionalProperties: false
+      required: [token, tokenType, expiresIn, user]
+      properties:
+        token:
+          type: string
+          description: Подписанный JWT
+        tokenType:
+          type: string
+          enum: [Bearer]
+          description: Схема передачи токена
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Время жизни токена в секундах
+        user:
+          $ref: '#/components/schemas/User'
+
+    Project:
+      type: object
+      additionalProperties: false
+      required: [id, key, name, description, ownerId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        key:
+          type: string
+          description: |
+            Короткий ключ проекта для номеров задач (`ARIJ-1`). Уникален
+            глобально, состоит из заглавных латинских букв и цифр, не меняется.
+          pattern: '^[A-Z][A-Z0-9]{1,9}$'
+          minLength: 2
+          maxLength: 10
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: [string, 'null']
+          maxLength: 2000
+        ownerId:
+          type: string
+          format: uuid
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    ProjectCreate:
+      type: object
+      additionalProperties: false
+      required: [key, name]
+      properties:
+        key:
+          type: string
+          description: Уникальный ключ проекта; приводится к верхнему регистру
+          pattern: '^[A-Za-z][A-Za-z0-9]{1,9}$'
+          minLength: 2
+          maxLength: 10
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: [string, 'null']
+          maxLength: 2000
+
+    ProjectUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: Частичное обновление; `key` и `ownerId` изменить нельзя
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: [string, 'null']
+          maxLength: 2000
+
+    ProjectMember:
+      type: object
+      additionalProperties: false
+      required: [userId, email, name, role, joinedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        role:
+          type: string
+          enum: [owner, member]
+          description: Роль в проекте; на этапе 1 доступны owner и member
+        joinedAt:
+          type: string
+          format: date-time
+
+    MemberAdd:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          description: Email уже зарегистрированного пользователя
+        role:
+          type: string
+          enum: [member]
+          default: member
+          description: |
+            На этапе 1 новый участник всегда получает роль `member`.
+            Передача владения и назначение второго `owner` — post-MVP.
