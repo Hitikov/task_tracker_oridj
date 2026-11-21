@@ -24,8 +24,8 @@ Future<void> main() async {
   final personRepository = PersonRepository(db);
   final personController = PersonController(personRepository);
 
-  final demoMode = String.fromEnvironment('DEMO_MODE', defaultValue: '') ==
-      'true';
+  final demoMode =
+      String.fromEnvironment('DEMO_MODE', defaultValue: '') == 'true';
 
   runApp(ArijApp(personController: personController, demoMode: demoMode));
 }

@@ -10,8 +10,8 @@ import 'token_store.dart';
 /// Вызовы через REST по OpenAPI; в тестах подменяется фейком.
 class AuthRepository {
   AuthRepository({required ApiClient api, required TokenStore tokens})
-    : _api = api,
-      _tokens = tokens;
+      : _api = api,
+        _tokens = tokens;
 
   final ApiClient _api;
   final TokenStore _tokens;

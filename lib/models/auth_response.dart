@@ -32,9 +32,9 @@ class AuthResponse {
   final User user;
 
   Map<String, dynamic> toJson() => {
-    'token': token,
-    'tokenType': tokenType,
-    'expiresIn': expiresIn,
-    'user': user.toJson(),
-  };
+        'token': token,
+        'tokenType': tokenType,
+        'expiresIn': expiresIn,
+        'user': user.toJson(),
+      };
 }

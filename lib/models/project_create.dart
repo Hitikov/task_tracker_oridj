@@ -19,8 +19,8 @@ class ProjectCreate {
   final String? description;
 
   Map<String, dynamic> toJson() => {
-    'key': key,
-    'name': name,
-    if (description != null) 'description': description,
-  };
+        'key': key,
+        'name': name,
+        if (description != null) 'description': description,
+      };
 }
