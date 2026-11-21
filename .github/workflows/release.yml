@@ -320,10 +320,11 @@ jobs:
             $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           }
           $version = "${{ needs.lint.outputs.version }}"
+          $root = (Get-Location).Path
           & $iscc "installer\windows\arij.iss" `
             "/DAppVersion=$version" `
-            "/DSourceDir=build\windows\x64\runner\Release" `
-            "/DOutputDir=dist"
+            "/DSourceDir=$root\build\windows\x64\runner\Release" `
+            "/DOutputDir=$root\dist"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
           Get-ChildItem dist | Select-Object Name, Length
 
