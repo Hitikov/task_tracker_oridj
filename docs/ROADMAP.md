@@ -307,3 +307,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 1 | влит клиентский слой (dio, secure storage, Riverpod, экраны); все проверки зелёные | `a18edf8` |
 | 21.11.2026 | 1 | этап 1 влит в `main` после зелёного CI (`ebff6de`), PR #21 | `5606cfc` |
 | 21.11.2026 | 2 | создана ветка `feature/stage-2-tasks-backlog`, начата работа над задачами | `feature/stage-2-tasks-backlog` |
+| 21.11.2026 | 2 | влиты миграции, серверный API и клиентский Backlog; e2e Epic→Task→Subtask пройден; отчёт `docs/reports/stage-2.md` | `847c473` |
