@@ -4,7 +4,7 @@
 - **Ветка:** `feature/stage-3-kanban`
 - **PR:** [#26](https://github.com/Hitikov/task_tracker_oridj/pull/26)
 - **План:** [ROADMAP](../ROADMAP.md)
-- **Статус:** готов, ожидает мержа в `main`
+- **Статус:** завершён, влит в `main` (`cb8ea1f`, PR #26)
 
 ## Цель
 

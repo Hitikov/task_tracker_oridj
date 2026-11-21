@@ -7,19 +7,19 @@
 
 | Область | Состояние |
 |---|---|
-| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `a213ef2` |
+| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `cb8ea1f` |
 | Релизы | `v1.1.0` — APK + AAB + Windows zip + `SHA256SUMS.txt`; `v1.0.0` — Windows |
 | CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` |
-| Тесты | 250 серверных + 64 клиентских, зелёные |
-| Клиент | `ApiClient` (dio), `flutter_secure_storage`, Riverpod, экраны входа/проектов и Backlog с фильтрами; демо-вход за флагом `DEMO_MODE` |
-| Backend | `arij_server`: `/health`, миграции, JWT/Argon2id auth, CRUD проектов, участников и задач; единый формат ошибок |
+| Тесты | 279 серверных + 67 клиентских, зелёные |
+| Клиент | `ApiClient` (dio), secure storage, Riverpod, экраны входа/проектов, Backlog и Kanban с drag & drop |
+| Backend | `arij_server`: `/health`, миграции, JWT/Argon2id auth, CRUD проектов/задач, доска и смена статусов |
 | Docker | `docker-compose.yml` с PostgreSQL 16 + сервер, скрипты `scripts/dev-*.ps1`, `docs/local-dev.md` |
 | Issues | 10 открытых, размечены labels и milestones |
-| Документы | `docs/MVP.md`, `docs/ROADMAP.md`, `docs/architecture.md`, ADR-0001, OpenAPI 3.1, отчёты `docs/reports/stage-0.md`, `stage-1.md`, `stage-2.md` |
+| Документы | `docs/MVP.md`, `docs/ROADMAP.md`, `docs/architecture.md`, ADR-0001, OpenAPI 3.1, отчёты `docs/reports/stage-0.md` … `stage-3.md` |
 
-**Главный разрыв:** этапы 0–2 завершены — авторизация, проекты, задачи и Backlog
-работают через REST API и PostgreSQL. Следующий критический путь — Kanban
-и смена статусов (этап 3).
+**Главный разрыв:** этапы 0–3 завершены — авторизация, проекты, задачи, Backlog
+и Kanban работают через REST API и PostgreSQL. Следующий критический путь —
+полировка MVP (этап 4) и релиз 2.0.0 (этап 5).
 
 ## 2. Принципы
 
@@ -38,7 +38,7 @@
 | 0. Фундамент | `feature/stage-0-foundation` | 16–21 ноября | чистый репозиторий, ADR, OpenAPI, `server/`, Docker, backend CI | завершён |
 | 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | завершён |
 | 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | завершён |
-| 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | в работе |
+| 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | завершён |
 | 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | запланирован |
 | 5. Релиз 2.0.0 | `feature/stage-5-release-2.0.0` | 20–26 декабря | APK/AAB/Windows/Web, подпись, GitHub Release | запланирован |
 
@@ -311,3 +311,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 2 | этап 2 влит в `main` после зелёного CI, PR #23 | `a213ef2` |
 | 21.11.2026 | 3 | создана ветка `feature/stage-3-kanban`, начата работа над доской | `feature/stage-3-kanban` |
 | 21.11.2026 | 3 | влиты API доски и клиентский Kanban; e2e To Do → Done и сохранение после рестарта; отчёт `docs/reports/stage-3.md` | `b84426e` |
+| 21.11.2026 | 3 | этап 3 влит в `main` после зелёного CI, PR #26 | `cb8ea1f` |
