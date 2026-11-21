@@ -1,0 +1,18 @@
+{$DOMAIN} {
+	encode gzip
+
+	# REST API и health-check проксируются на Dart-сервер.
+	handle /health {
+		reverse_proxy server:8080
+	}
+	handle /api/* {
+		reverse_proxy server:8080
+	}
+
+	# Flutter Web (если собран в deploy/www). Для нативных клиентов не используется.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
