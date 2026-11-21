@@ -10,6 +10,7 @@ RUN dart pub get
 
 COPY bin ./bin
 COPY lib ./lib
+COPY migrations ./migrations
 
 RUN dart compile exe bin/server.dart -o /app/server
 
@@ -27,11 +28,13 @@ WORKDIR /app
 # Dart runtime shared libraries required by the AOT-compiled executable.
 COPY --from=build /runtime/ /
 COPY --from=build --chown=arij:arij /app/server /app/server
+COPY --from=build --chown=arij:arij /app/migrations /app/migrations
 
 USER arij
 
 ENV SERVER_HOST=0.0.0.0 \
-    SERVER_PORT=8080
+    SERVER_PORT=8080 \
+    MIGRATIONS_DIR=/app/migrations
 
 EXPOSE 8080
 
