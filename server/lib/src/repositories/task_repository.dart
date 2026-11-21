@@ -162,7 +162,7 @@ class PostgresTaskRepository implements TaskRepository {
       'ORDER BY t.number',
       parameters: parameters,
     );
-    return <Task>[for (final row in result) Task.fromMap(_columnMap(row))];
+    return <Task>[for (final row in result) _taskFromRow(row)];
   }
 
   @override
@@ -176,7 +176,14 @@ class PostgresTaskRepository implements TaskRepository {
     if (result.isEmpty) {
       return null;
     }
-    return Task.fromMap(_columnMap(result.first));
+    return _taskFromRow(result.first);
+  }
+
+  /// Builds a [Task] from a joined row; `key` is `<project key>-<number>`.
+  Task _taskFromRow(ResultRow row) {
+    final map = _columnMap(row);
+    map['key'] = '${map['key']}-${map['number']}';
+    return Task.fromMap(map);
   }
 
   @override
@@ -208,18 +215,17 @@ class PostgresTaskRepository implements TaskRepository {
           }
           final result = await tx.execute(
             'INSERT INTO tasks ('
-            'project_id, number, key, kind, type_id, status_id, title, '
+            'project_id, number, kind, type_id, status_id, title, '
             'description, priority, assignee_id, reporter_id, parent_id, '
             'due_date, created_at, updated_at) '
             'VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11, '
-            '\$12, \$13, now(), now()) '
-            'RETURNING id, project_id, number, key, kind, type_id, status_id, '
+            '\$12, now(), now()) '
+            'RETURNING id, project_id, number, kind, type_id, status_id, '
             'title, description, priority, assignee_id, reporter_id, '
             'parent_id, due_date, created_at, updated_at',
             parameters: <Object?>[
               projectId,
               number,
-              '$projectKey-$number',
               kind,
               typeId,
               statusId,
@@ -232,7 +238,9 @@ class PostgresTaskRepository implements TaskRepository {
               dueDate,
             ],
           );
-          created = Task.fromMap(_columnMap(result.first));
+          final map = _columnMap(result.first);
+          map['key'] = '$projectKey-$number';
+          created = Task.fromMap(map);
         });
       } on UniqueViolationException {
         // Lost a concurrent-insert race on the (project_id, number)
