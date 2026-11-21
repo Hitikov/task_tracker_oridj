@@ -5,15 +5,20 @@ import '../config/app_config.dart';
 /// Обёртка над пулом PostgreSQL-соединений, созданным из [AppConfig].
 class Database {
   Database(AppConfig config)
-    : _pool = Pool<Never>.withEndpoints(<Endpoint>[
-        Endpoint(
-          host: config.dbHost,
-          port: config.dbPort,
-          database: config.dbName,
-          username: config.dbUser,
-          password: config.dbPassword,
-        ),
-      ]);
+    : _pool = Pool<Never>.withEndpoints(
+        <Endpoint>[
+          Endpoint(
+            host: config.dbHost,
+            port: config.dbPort,
+            database: config.dbName,
+            username: config.dbUser,
+            password: config.dbPassword,
+          ),
+        ],
+        // Локальный PostgreSQL в docker compose работает без TLS.
+        // В production соединение защищается Nginx/сетью, а не TLS внутри compose.
+        settings: PoolSettings(sslMode: SslMode.disable),
+      );
 
   final Pool<Never> _pool;
 

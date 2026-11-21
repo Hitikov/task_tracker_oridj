@@ -25,8 +25,9 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Dart runtime shared libraries required by the AOT-compiled executable.
-COPY --from=build /runtime/ /
+# AOT-бинарник использует системные библиотеки bookworm-slim (glibc 2.36),
+# поэтому копировать /runtime из dart:stable не нужно. Прямое копирование
+# /runtime/ в / ломается из-за симлинка /lib -> usr/lib в Debian bookworm.
 COPY --from=build --chown=arij:arij /app/server /app/server
 COPY --from=build --chown=arij:arij /app/migrations /app/migrations
 
