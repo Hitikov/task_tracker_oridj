@@ -1,12 +1,14 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/person_controller.dart';
 import '../state/auth_providers.dart';
+import '../updates/update_dialog.dart';
+import '../updates/update_service.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/roadmap_view.dart';
 import '../widgets/section_placeholder.dart';
-import 'db_demo_page.dart';
 import 'home_section.dart';
 import 'login_page.dart';
 import 'projects_page.dart';
@@ -39,14 +41,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     setState(() => _selectedSection = section);
   }
 
-  void _openDbDemo() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => DbDemoPage(
-          personController: widget.personController,
-        ),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    // Не дёргаем GitHub API в отладочных/тестовых сборках.
+    if (!kDebugMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+    }
+  }
+
+  Future<void> _checkForUpdate() async {
+    final update = await ref.read(updateServiceProvider).check();
+    if (update == null || !mounted) return;
+    await showUpdateDialog(context, update);
   }
 
   void _logout() {
@@ -82,6 +89,11 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
           IconButton(
+            onPressed: _checkForUpdate,
+            tooltip: 'Проверить обновления',
+            icon: const Icon(Icons.system_update),
+          ),
+          IconButton(
             onPressed: _logout,
             tooltip: 'Выйти',
             icon: const Icon(Icons.logout),
@@ -96,7 +108,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 login: widget.login,
                 selectedSection: _selectedSection,
                 onSectionSelected: _selectSection,
-                onDbDemoSelected: _openDbDemo,
                 onLogout: _logout,
                 closeOnSelect: true,
               ),
@@ -111,7 +122,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 login: widget.login,
                 selectedSection: _selectedSection,
                 onSectionSelected: _selectSection,
-                onDbDemoSelected: _openDbDemo,
                 onLogout: _logout,
               ),
             ),

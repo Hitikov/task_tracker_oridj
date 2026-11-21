@@ -12,7 +12,6 @@ class AppSidebar extends StatelessWidget {
     required this.login,
     required this.selectedSection,
     required this.onSectionSelected,
-    required this.onDbDemoSelected,
     required this.onLogout,
     this.closeOnSelect = false,
   });
@@ -20,7 +19,6 @@ class AppSidebar extends StatelessWidget {
   final String login;
   final HomeSection selectedSection;
   final ValueChanged<HomeSection> onSectionSelected;
-  final VoidCallback onDbDemoSelected;
   final VoidCallback onLogout;
 
   /// Если меню открыто в [Drawer], после выбора его нужно закрыть.
@@ -76,25 +74,6 @@ class AppSidebar extends StatelessWidget {
                   children: [
                     for (final section in HomeSection.values)
                       _sectionTile(context, section),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(),
-                    ),
-                    Text(
-                      'Сервис',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    ListTile(
-                      leading: const Icon(Icons.storage_outlined),
-                      title: const Text('Демо работы с БД'),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      onTap: () => _afterDrawer(context, onDbDemoSelected),
-                    ),
                   ],
                 ),
               ),
