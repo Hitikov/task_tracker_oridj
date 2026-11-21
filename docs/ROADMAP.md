@@ -304,3 +304,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 1 | миграции и слой PostgreSQL проверены на живом Docker, влиты в ветку этапа; отчёт `docs/reports/stage-1-db.md` | `d92e8a0` |
 | 21.11.2026 | 1 | влиты auth (Argon2id + JWT) и PostgreSQL service в CI; обновлена контрольная точка `docs/reports/stage-1-checkpoint.md` | `dd0bb21` |
 | 21.11.2026 | 1 | влиты проекты/участники и аудит зависимостей; роуты подключены; e2e через Docker пройден, CI зелёный | `6344967` |
+| 21.11.2026 | 1 | влит клиентский слой (dio, secure storage, Riverpod, экраны); все проверки зелёные | `a18edf8` |

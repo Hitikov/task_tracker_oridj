@@ -4,7 +4,7 @@
 - **Ветка:** `feature/stage-1-auth-projects`
 - **PR:** [#21](https://github.com/Hitikov/task_tracker_oridj/pull/21) (draft)
 - **План:** [ROADMAP](../ROADMAP.md)
-- **Статус:** серверная часть готова; клиентский слой завершается
+- **Статус:** готов, готовится к мержу в `main`
 
 ## Цель этапа
 
@@ -20,7 +20,7 @@
 | Проекты | CRUD проектов и участников, роли owner/member, 8 хендлеров, 75 тестов | `a0b20c2`, роуты `cde3d76` |
 | CI | PostgreSQL 16 service в job `backend`, интеграционный тест миграций реально выполняется | `2552bc0` |
 | Зависимости | аудит версий, `cli_util 0.6.1`, `coverage 1.16.1`, отчёт | `d8055c4` |
-| Клиент | `dio` + `ApiClient`, secure storage, Riverpod, экраны — завершается | ожидается |
+| Клиент | `dio` + `ApiClient`, secure storage, Riverpod, экраны входа/проектов, 48 тестов | `a18edf8` |
 
 ## Контракты API
 
@@ -38,7 +38,7 @@
 | Проверка | Результат |
 |---|---|
 | `dart format` / `dart analyze` / `dart test` в `server/` | 140 тестов, 1 skipped локально без БД |
-| `flutter analyze` / `flutter test` | 26 тестов (до подключения клиентского слоя) |
+| `flutter analyze` / `flutter test` | 48 тестов, ошибок нет |
 | CI на `6344967` | все job зелёные; тест миграций с живой БД без `Skip` |
 | Docker e2e | register 201 → project 201 → list/get 200 → member 201 → 403 → 409 → 204 → `/health` 200 |
 | `git diff --check` | чисто |
