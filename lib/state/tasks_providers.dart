@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
+import '../models/board_column.dart';
 import '../models/project_member.dart';
 import '../models/status.dart';
 import '../models/task.dart';
@@ -126,6 +127,25 @@ class TasksNotifier extends AsyncNotifier<List<Task>> {
       rethrow;
     }
   }
+
+  /// Синхронизирует задачу, полученную из другого источника (например, Kanban).
+  ///
+  /// Если задача уже есть в списке — заменяет её; если нет и список загружен —
+  /// добавляет. Это позволяет Backlog видеть актуальный статус после переноса
+  /// на доске без повторного запроса.
+  void syncTask(Task task) {
+    final current = state.value;
+    if (current == null) return;
+    final index = current.indexWhere((item) => item.id == task.id);
+    if (index == -1) {
+      state = AsyncValue.data(<Task>[...current, task]);
+      return;
+    }
+    state = AsyncValue.data(<Task>[
+      for (final item in current)
+        if (item.id == task.id) task else item,
+    ]);
+  }
 }
 
 final tasksProvider =
@@ -144,3 +164,129 @@ final filteredTasksProvider =
       const <ProjectMember>[];
   return filters.apply(tasks, statuses: statuses, members: members);
 });
+
+/// Контроллер Kanban-доски: загрузка колонок и оптимистичное перемещение.
+///
+/// При перемещении задача сразу переносится в целевую колонку, а запрос
+/// `PATCH /api/v1/tasks/{id}/status` выполняется в фоне. При ошибке состояние
+/// доски откатывается, ошибка пробрасывается в UI.
+class BoardController extends AsyncNotifier<List<BoardColumn>> {
+  BoardController(this.projectId);
+
+  final String projectId;
+
+  @override
+  Future<List<BoardColumn>> build() async {
+    return ref.read(taskRepositoryProvider).getBoard(projectId);
+  }
+
+  List<BoardColumn> get columns => state.value ?? const <BoardColumn>[];
+
+  Future<void> refresh() async {
+    state = const AsyncValue<List<BoardColumn>>.loading();
+    try {
+      final board = await ref.read(taskRepositoryProvider).getBoard(projectId);
+      state = AsyncValue.data(board);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
+  }
+
+  /// Оптимистично переносит задачу в колонку [toStatusId].
+  ///
+  /// При ошибке откатывает доску к состоянию до переноса и пробрасывает
+  /// исключение, чтобы UI мог показать индикацию ошибки.
+  Future<Task> moveTask({
+    required String taskId,
+    required String toStatusId,
+  }) async {
+    final current = columns;
+    final previous = _cloneColumns(current);
+    final located = _locateTask(current, taskId);
+    if (located == null) {
+      throw StateError('Task $taskId not found on board');
+    }
+    final (fromIndex, taskIndex, task) = located;
+    final toIndex = current.indexWhere((c) => c.status.id == toStatusId);
+    if (toIndex == -1) {
+      throw StateError('Status $toStatusId not found on board');
+    }
+    if (fromIndex == toIndex) return task;
+
+    final optimisticTask = task.applyUpdate(TaskUpdate(statusId: toStatusId));
+    final next = _cloneColumns(current);
+    next[fromIndex] = next[fromIndex].copyWith(
+      tasks: <Task>[
+        for (final item in next[fromIndex].tasks)
+          if (item.id != taskId) item,
+      ],
+    );
+    final targetTasks = List<Task>.of(next[toIndex].tasks)..add(optimisticTask);
+    next[toIndex] = next[toIndex].copyWith(tasks: targetTasks);
+    state = AsyncValue.data(next);
+
+    try {
+      final updated = await ref
+          .read(taskRepositoryProvider)
+          .updateTaskStatus(taskId, toStatusId);
+      _replaceTask(updated);
+      ref.read(tasksProvider(projectId).notifier).syncTask(updated);
+      return updated;
+    } catch (_) {
+      state = AsyncValue.data(previous);
+      rethrow;
+    }
+  }
+
+  void _replaceTask(Task updated) {
+    final current = columns;
+    if (current.isEmpty) return;
+    final next = <BoardColumn>[];
+    var found = false;
+    for (final column in current) {
+      final without = <Task>[
+        for (final task in column.tasks)
+          if (task.id != updated.id) task,
+      ];
+      if (without.length != column.tasks.length) {
+        found = true;
+      }
+      if (column.status.id == updated.statusId) {
+        final hasInTarget = without.any((t) => t.id == updated.id);
+        next.add(
+          column.copyWith(
+            tasks: hasInTarget ? without : <Task>[...without, updated],
+          ),
+        );
+      } else {
+        next.add(column.copyWith(tasks: without));
+      }
+    }
+    if (found) {
+      // Normal case: task was moved out of old column and inserted into new.
+    }
+    state = AsyncValue.data(next);
+  }
+
+  (int, int, Task)? _locateTask(List<BoardColumn> columns, String taskId) {
+    for (var i = 0; i < columns.length; i++) {
+      final tasks = columns[i].tasks;
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id == taskId) return (i, j, tasks[j]);
+      }
+    }
+    return null;
+  }
+
+  List<BoardColumn> _cloneColumns(List<BoardColumn> columns) {
+    return <BoardColumn>[
+      for (final column in columns)
+        column.copyWith(tasks: List<Task>.of(column.tasks)),
+    ];
+  }
+}
+
+final boardProvider =
+    AsyncNotifierProvider.family<BoardController, List<BoardColumn>, String>(
+  BoardController.new,
+);
