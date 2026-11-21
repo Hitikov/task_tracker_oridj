@@ -1,76 +1,60 @@
 # Контрольная точка: этап 1 (21.11.2026)
 
-> Работа остановлена по просьбе пользователя. Файл фиксирует состояние на момент остановки.
+> Текущее состояние этапа 1. Работа возобновлена после паузы; приложение
+> запускается на Windows для демонстрации сделанного.
 
 ## Состояние репозитория
 
 | Объект | Значение |
 |---|---|
 | `main` | `04cf9a3` — этап 0 полностью влит (PR #19, PR #20), CI зелёный |
-| Ветка этапа | `feature/stage-1-auth-projects`, head `6478db8`, запушена |
+| Ветка этапа | `feature/stage-1-auth-projects`, head `dd0bb21`, запушена |
 | Draft PR | [#21](https://github.com/Hitikov/task_tracker_oridj/pull/21) |
-| Локальная копия | переключена на `feature/stage-1-auth-projects`, чистая |
-| Worktrees | `stage-1-db`, `stage-1-auth`, `stage-1-projects`, `stage-1-client`, `stage-1-ci` (все от `6478db8`) |
+| Локальная копия | `feature/stage-1-auth-projects`, чистая |
+| Рабочие модели | `opencode/tidepool-alpha-free#max` (DeepSeek Free — лимит исчерпан) |
 
-## Что сделано
+## Влитые потоки
 
-- Создана ветка этапа 1 и draft PR #21 с чек-листом DoD.
-- В `docs/ROADMAP.md` этап 1 отмечен «в работе», добавлена запись в журнал.
-- Подготовлены пять worktree для потоков этапа 1.
-- Запущен поток «миграции + слой БД» в `agent/stage-1-db`.
+| Поток | Ветка | Merge | Результат |
+|---|---|---|---|
+| БД и миграции | `agent/stage-1-db` | `d92e8a0` | 4 миграции, пул, раннер, живая проверка в Docker |
+| CI | `agent/stage-1-ci` | `2552bc0` | PostgreSQL service в job `backend`, env для интеграционного теста |
+| Auth | `agent/stage-1-auth` | `1911591` | register/login/me, Argon2id + JWT, middleware, 65 тестов |
+| Исправление конфига | — | `dd0bb21` | `AppConfig` явно передаётся в `buildHandler()` |
 
-## Модели
+Отчёты: [поток БД](stage-1-db.md), [этап 0](stage-0.md), [план](ROADMAP.md).
 
-- `opencode/deepseek-v4.1-flash-free#max` — лимит исчерпан (`Free usage limit reached`), поток прервался до создания файлов.
-- Перезапуск на `opencode/tidepool-alpha-free#max` — работает.
+## Что проверено
 
-## Docker
+- `dart format` / `dart analyze` / `dart test` в `server/`: 65 тестов, 1 skipped
+  (интеграционный тест без БД), ошибок нет.
+- `flutter analyze` / `flutter test`: 26 тестов, ошибок нет.
+- Docker Desktop 29.9.3 + Compose v5.7.0:
+  `compose up -d --build`, `/health` = 200, все 4 миграции применены,
+  ограничения БД отклоняют некорректные данные, рестарт идемпотентен,
+  `compose down -v` выполнен.
+- Auth через реальный PostgreSQL: register → 201, дубликат → 409 `email_taken`,
+  login → 200, неверные данные → 401 `invalid_credentials`,
+  `/me` с Bearer → 200, без токена → 401 `unauthorized`.
+- В CI на `f4cf373` зелёный прогон. Проверка integration-теста с новым
+  PostgreSQL service (после `2552bc0`) ещё не подтверждена логами.
 
-- Docker Desktop установлен в `C:\Users\Andre\AppData\Local\Programs\DockerDesktop`; CLI не в PATH.
-- Полный путь: `C:\Users\Andre\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`.
-- Демон запущен: server `29.9.3`, Compose `v5.7.0`.
-- `docker compose config --quiet` проходит; сервисы `postgres`, `server`.
-- Локальный `.env` создан из `.env.example` (игнорируется git).
-- На момент остановки запущенных контейнеров нет.
+## Осталось в этапе 1
 
-## Незавершённый поток БД (`agent/stage-1-db`)
+1. Поток проектов/участников (`agent/stage-1-projects`) — ещё не запущен.
+2. Клиентский слой: `ApiClient` на `dio`, secure storage, Riverpod/Bloc,
+   экраны входа и проектов (`agent/stage-1-client`) — ещё не запущен.
+3. Подтвердить в логах CI, что тест миграций не `skip`.
+4. Финальный прогон и мерж PR #21 в `main`.
+5. Верификация Demo-входа `12345/12345` пока сохраняется (реальный auth
+   подключится к клиенту на этапе 1).
 
-Worktree: `C:\Users\Andre\.local\share\opencode\worktree\7601ed\stage-1-db`
-Ветка `agent/stage-1-db` ещё не имеет коммитов; все изменения **незакоммичены** в worktree.
+## Запуск приложения на Windows
 
-Создано:
+```powershell
+flutter run -d windows
+```
 
-- `server/migrations/0000_schema_migrations.sql`
-- `server/migrations/0001_users.sql`
-- `server/migrations/0002_projects.sql`
-- `server/migrations/0003_project_members.sql`
-- `server/lib/src/db/database.dart`
-- `server/lib/src/db/migration_runner.dart`
-- `server/test/db/migrations_test.dart`
-- `server/test/db/migration_runner_helpers_test.dart`
-- `server/test/db/migrations_integration_test.dart`
-
-Изменено: `server/Dockerfile`, `server/README.md`, `server/bin/server.dart`.
-
-Агент случайно запустил `dart format` из корня worktree и переписал клиентские
-файлы, но сразу выполнил `git restore lib test`. На момент остановки `git status`
-показывает изменения **только в `server/`**, клиент не затронут.
-
-Агент остановлен по команде, коммиты и пуш не выполнялись.
-
-### Проверки, уже выполненные агентом
-
-- `dart pub get` — OK
-- `dart format --set-exit-if-changed .` в `server/` — 1 файл отформатирован
-- `dart analyze` — без замечаний
-- `dart test` — все тесты зелёные, 1 skipped (интеграционный тест без БД)
-- `git diff --check` — exit 0
-
-Не проверено: синтаксис SQL парсером, живые миграции в PostgreSQL, коммиты и пуш.
-
-## Следующие шаги после возобновления
-
-1. Проверить uncommitted-изменения в `stage-1-db` (только `server/`), закоммитить 2–3 коммита и запушить `agent/stage-1-db`.
-2. На живой БД: `docker compose up -d --build`, `GET /health`, `psql` → `\dt`, `schema_migrations`, `\d users/projects/project_members`, проверка частичного уникального индекса owner, `compose restart server` на идемпотентность, затем `compose down -v`.
-3. Проверить ветку в GitHub и влить в `feature/stage-1-auth-projects`.
-4. Запустить потоки `auth` → `projects` → `client` → `ci` (PostgreSQL service в CI).
+Демо-вход: `12345` / `12345`. Сервер и PostgreSQL для демонстрации пока
+не нужны — клиент работает с локальным Drift в демо-режиме; реальный API
+появится после подключения клиентского слоя.
