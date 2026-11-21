@@ -11,14 +11,17 @@ import 'http/json_response.dart';
 import 'http/request_id.dart';
 import 'http/request_logging.dart';
 import 'middleware/auth_middleware.dart';
+import 'repositories/board_repository.dart';
 import 'repositories/project_repository.dart';
 import 'repositories/task_repository.dart';
 import 'repositories/user_repository.dart';
 import 'routes/auth_routes.dart';
+import 'routes/board_routes.dart';
 import 'routes/health_routes.dart';
 import 'routes/project_routes.dart';
 import 'routes/task_routes.dart';
 import 'services/auth_service.dart';
+import 'services/board_service.dart';
 import 'services/project_service.dart';
 import 'services/task_service.dart';
 
@@ -62,6 +65,9 @@ Handler buildHandler({
   late final TaskRepository taskRepository = PostgresTaskRepository(database);
   late final TaskService taskService = TaskService(repository: taskRepository);
   late final TaskRoutes taskRoutes = TaskRoutes(taskService);
+  late final BoardRoutes boardRoutes = BoardRoutes(
+    BoardService(repository: TaskBackedBoardRepository(taskRepository)),
+  );
   late final Middleware projectAuth = authMiddleware(
     jwtSecret: jwtSecret ?? resolvedConfig.jwtSecret,
     repository: repository,
@@ -151,6 +157,14 @@ Handler buildHandler({
         ..get(
           '/api/v1/projects/<id>/statuses',
           (Request request) => projectAuth(taskRoutes.listStatuses)(request),
+        )
+        ..patch(
+          '/api/v1/tasks/<id>/status',
+          (Request request) => projectAuth(boardRoutes.changeStatus)(request),
+        )
+        ..get(
+          '/api/v1/projects/<id>/board',
+          (Request request) => projectAuth(boardRoutes.getBoard)(request),
         );
 
   return const Pipeline()
