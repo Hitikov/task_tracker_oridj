@@ -7,6 +7,7 @@ import '../models/project_create.dart';
 import '../state/auth_providers.dart';
 import '../state/projects_providers.dart';
 import 'backlog_page.dart';
+import 'kanban_page.dart';
 
 /// Экран проектов: список + создание нового проекта
 /// (`POST /api/v1/projects`, схема `ProjectCreate`).
@@ -46,6 +47,7 @@ class ProjectsPage extends ConsumerWidget {
                   itemBuilder: (context, index) => _ProjectTile(
                     project: list[index],
                     onTap: () => _openProject(context, list[index]),
+                    onKanban: () => _openKanban(context, list[index]),
                   ),
                 ),
         ),
@@ -76,13 +78,27 @@ class ProjectsPage extends ConsumerWidget {
       ),
     );
   }
+
+  /// Открывает Kanban-доску выбранного проекта.
+  void _openKanban(BuildContext context, Project project) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => KanbanPage(project: project),
+      ),
+    );
+  }
 }
 
 class _ProjectTile extends StatelessWidget {
-  const _ProjectTile({required this.project, required this.onTap});
+  const _ProjectTile({
+    required this.project,
+    required this.onTap,
+    required this.onKanban,
+  });
 
   final Project project;
   final VoidCallback onTap;
+  final VoidCallback onKanban;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +108,17 @@ class _ProjectTile extends StatelessWidget {
       leading: Icon(Icons.folder_outlined, color: theme.colorScheme.primary),
       title: Text(project.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(project.key),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Kanban',
+            onPressed: onKanban,
+            icon: const Icon(Icons.view_kanban_outlined),
+          ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: onTap,
     );
   }
