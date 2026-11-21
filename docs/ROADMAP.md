@@ -37,7 +37,7 @@
 |---|---|---|---|---|
 | 0. Фундамент | `feature/stage-0-foundation` | 16–21 ноября | чистый репозиторий, ADR, OpenAPI, `server/`, Docker, backend CI | завершён |
 | 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | в работе |
-| 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | запланирован |
+| 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | в работе |
 | 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | запланирован |
 | 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | запланирован |
 | 5. Релиз 2.0.0 | `feature/stage-5-release-2.0.0` | 20–26 декабря | APK/AAB/Windows/Web, подпись, GitHub Release | запланирован |
@@ -305,3 +305,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 1 | влиты auth (Argon2id + JWT) и PostgreSQL service в CI; обновлена контрольная точка `docs/reports/stage-1-checkpoint.md` | `dd0bb21` |
 | 21.11.2026 | 1 | влиты проекты/участники и аудит зависимостей; роуты подключены; e2e через Docker пройден, CI зелёный | `6344967` |
 | 21.11.2026 | 1 | влит клиентский слой (dio, secure storage, Riverpod, экраны); все проверки зелёные | `a18edf8` |
+| 21.11.2026 | 2 | создана ветка `feature/stage-2-tasks-backlog`, начата работа над задачами | `feature/stage-2-tasks-backlog` |
