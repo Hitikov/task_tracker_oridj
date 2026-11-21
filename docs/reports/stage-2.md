@@ -4,7 +4,7 @@
 - **Ветка:** `feature/stage-2-tasks-backlog`
 - **PR:** [#23](https://github.com/Hitikov/task_tracker_oridj/pull/23)
 - **План:** [ROADMAP](../ROADMAP.md)
-- **Статус:** готов, ожидает мержа в `main`
+- **Статус:** завершён, влит в `main` (`a213ef2`, PR #23)
 
 ## Цель
 
