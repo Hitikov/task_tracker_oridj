@@ -126,23 +126,12 @@ void main() {
     expect(find.text('Планы развития Arij'), findsOneWidget);
   });
 
-  testWidgets('из меню открывается демо работы с БД', (tester) async {
+  testWidgets('проверка обновлений доступна на главном экране', (tester) async {
     await pumpApp(tester);
     await login(tester);
 
-    await tester.tap(find.byIcon(Icons.menu));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Демо работы с БД'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Демо работы с БД'), findsOneWidget);
-    expect(
-      find.widgetWithText(
-        ElevatedButton,
-        'Запустить CRUD-демо (Проверка связи с БД)',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byIcon(Icons.system_update), findsOneWidget);
+    expect(find.text('Демо работы с БД'), findsNothing);
   });
 
   testWidgets('регистрация возвращает email на экран входа', (tester) async {
