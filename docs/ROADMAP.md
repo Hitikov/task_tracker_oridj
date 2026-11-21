@@ -38,7 +38,7 @@
 | 0. Фундамент | `feature/stage-0-foundation` | 16–21 ноября | чистый репозиторий, ADR, OpenAPI, `server/`, Docker, backend CI | завершён |
 | 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | завершён |
 | 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | завершён |
-| 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | запланирован |
+| 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | в работе |
 | 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | запланирован |
 | 5. Релиз 2.0.0 | `feature/stage-5-release-2.0.0` | 20–26 декабря | APK/AAB/Windows/Web, подпись, GitHub Release | запланирован |
 
@@ -309,3 +309,5 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 2 | создана ветка `feature/stage-2-tasks-backlog`, начата работа над задачами | `feature/stage-2-tasks-backlog` |
 | 21.11.2026 | 2 | влиты миграции, серверный API и клиентский Backlog; e2e Epic→Task→Subtask пройден; отчёт `docs/reports/stage-2.md` | `847c473` |
 | 21.11.2026 | 2 | этап 2 влит в `main` после зелёного CI, PR #23 | `a213ef2` |
+| 21.11.2026 | 3 | создана ветка `feature/stage-3-kanban`, начата работа над доской | `feature/stage-3-kanban` |
+| 21.11.2026 | 3 | влиты API доски и клиентский Kanban; e2e To Do → Done и сохранение после рестарта; отчёт `docs/reports/stage-3.md` | `b84426e` |

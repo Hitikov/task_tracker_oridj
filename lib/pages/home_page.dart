@@ -147,8 +147,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           icon: Icons.add_task_outlined,
           title: 'Создание задачи',
           description: 'Задачи живут внутри проекта. Откройте раздел '
-              '«Проекты», выберите проект и нажмите «Задача», чтобы создать '
-              'эпик, задачу или подзадачу.',
+              '«Проекты», выберите проект и откройте Backlog или Kanban, '
+              'чтобы создавать и перемещать задачи.',
           actions: [
             FilledButton.icon(
               onPressed: () => _selectSection(HomeSection.projects),

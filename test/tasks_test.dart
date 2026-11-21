@@ -477,4 +477,146 @@ void main() {
       });
     });
   });
+
+  group('Board', () {
+    test('loads board columns with tasks grouped by status', () async {
+      final api = FakeApiClient(
+        statuses: [
+          fakeStatus(
+            id: 's-todo',
+            projectId: _projectId,
+            name: 'To Do',
+            position: 0,
+          ).toJson(),
+          fakeStatus(
+            id: 's-done',
+            projectId: _projectId,
+            name: 'Done',
+            position: 1,
+            isDone: true,
+          ).toJson(),
+        ],
+        tasks: [
+          _task(id: 't1', number: 1, title: 'A', statusId: 's-todo').toJson(),
+          _task(id: 't2', number: 2, title: 'B', statusId: 's-done').toJson(),
+        ],
+      );
+      final container = _container(api);
+      addTearDown(container.dispose);
+
+      final board = await container.read(boardProvider(_projectId).future);
+
+      expect(board, hasLength(2));
+      expect(board[0].status.name, 'To Do');
+      expect(board[0].tasks.map((t) => t.id), ['t1']);
+      expect(board[1].status.name, 'Done');
+      expect(board[1].tasks.map((t) => t.id), ['t2']);
+      expect(
+        api.calls.any((c) => c.path == '/api/v1/projects/$_projectId/board'),
+        isTrue,
+      );
+    });
+
+    test('moves task optimistically and syncs tasks provider', () async {
+      final api = FakeApiClient(
+        statuses: [
+          fakeStatus(
+            id: 's-todo',
+            projectId: _projectId,
+            name: 'To Do',
+            position: 0,
+          ).toJson(),
+          fakeStatus(
+            id: 's-doing',
+            projectId: _projectId,
+            name: 'In Progress',
+            position: 1,
+          ).toJson(),
+        ],
+        tasks: [
+          _task(
+            id: 't1',
+            number: 1,
+            title: 'Move me',
+            statusId: 's-todo',
+          ).toJson(),
+        ],
+      );
+      final container = _container(api);
+      addTearDown(container.dispose);
+
+      await container.read(tasksProvider(_projectId).future);
+      await container.read(boardProvider(_projectId).future);
+
+      final updated = await container
+          .read(boardProvider(_projectId).notifier)
+          .moveTask(taskId: 't1', toStatusId: 's-doing');
+
+      expect(updated.statusId, 's-doing');
+      final board = container.read(boardProvider(_projectId)).value!;
+      expect(board[0].tasks, isEmpty);
+      expect(board[1].tasks.single.id, 't1');
+      expect(board[1].tasks.single.statusId, 's-doing');
+
+      final tasks = container.read(tasksProvider(_projectId)).value!;
+      expect(tasks.single.statusId, 's-doing');
+      expect(
+        api.calls.any(
+          (c) =>
+              c.path == '/api/v1/tasks/t1/status' &&
+              c.body?['statusId'] == 's-doing',
+        ),
+        isTrue,
+      );
+    });
+
+    test('rolls back board on move error and keeps tasks provider', () async {
+      final api = FakeApiClient(
+        statuses: [
+          fakeStatus(
+            id: 's-todo',
+            projectId: _projectId,
+            name: 'To Do',
+            position: 0,
+          ).toJson(),
+          fakeStatus(
+            id: 's-doing',
+            projectId: _projectId,
+            name: 'In Progress',
+            position: 1,
+          ).toJson(),
+        ],
+        tasks: [
+          _task(
+            id: 't1',
+            number: 1,
+            title: 'Move me',
+            statusId: 's-todo',
+          ).toJson(),
+        ],
+        throwOnPatch: true,
+      );
+      final container = _container(api);
+      addTearDown(container.dispose);
+
+      await container.read(tasksProvider(_projectId).future);
+      await container.read(boardProvider(_projectId).future);
+
+      await expectLater(
+        container.read(boardProvider(_projectId).notifier).moveTask(
+              taskId: 't1',
+              toStatusId: 's-doing',
+            ),
+        throwsA(isA<ApiException>()),
+      );
+
+      final board = container.read(boardProvider(_projectId)).value!;
+      expect(board[0].tasks.single.id, 't1');
+      expect(board[0].tasks.single.statusId, 's-todo');
+      expect(board[1].tasks, isEmpty);
+
+      final tasks = container.read(tasksProvider(_projectId)).value!;
+      expect(tasks.single.statusId, 's-todo');
+    });
+  });
 }
