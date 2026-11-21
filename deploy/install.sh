@@ -31,7 +31,7 @@ apt-get update
 apt-get install -y ca-certificates curl gnupg git openssl
 
 echo "==> Удаление конфликтующих пакетов Docker (если есть)"
-apt-get remove -y docker.io docker-doc docker-compose podman-docker containerd runc || true
+apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc || true
 
 echo "==> Установка Docker и Compose v2"
 install -m 0755 -d /etc/apt/keyrings
