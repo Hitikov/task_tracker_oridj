@@ -36,8 +36,9 @@
 - Auth через реальный PostgreSQL: register → 201, дубликат → 409 `email_taken`,
   login → 200, неверные данные → 401 `invalid_credentials`,
   `/me` с Bearer → 200, без токена → 401 `unauthorized`.
-- В CI на `f4cf373` зелёный прогон. Проверка integration-теста с новым
-  PostgreSQL service (после `2552bc0`) ещё не подтверждена логами.
+- CI на `e217073` зелёный по всем job. По логам `backend` подтверждено:
+  `test/db/migrations_integration_test.dart: applies migrations to a live
+  PostgreSQL` выполнен без `Skip`, сервис PostgreSQL 16 стартовал.
 
 ## Осталось в этапе 1
 
