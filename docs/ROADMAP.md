@@ -7,19 +7,19 @@
 
 | Область | Состояние |
 |---|---|
-| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `5481791` |
+| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `5606cfc` |
 | Релизы | `v1.1.0` — APK + AAB + Windows zip + `SHA256SUMS.txt`; `v1.0.0` — Windows |
-| CI/CD | `lint → test → build-android + build-windows`; Release по тегу `v*` |
-| Тесты | 26 тестов, зелёные |
-| Клиент | UI-оболочка, демо-вход `12345/12345`, локальный Drift CRUD над `Person` |
-| Backend | каркас `server/` (`arij_server`): `/health`, конфиг, CORS, логирование, 19 тестов; бизнес-логики пока нет |
+| CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` |
+| Тесты | 140 серверных + 48 клиентских, зелёные |
+| Клиент | `ApiClient` (dio), `flutter_secure_storage`, Riverpod, экраны входа/регистрации/проектов; демо-вход за флагом `DEMO_MODE` |
+| Backend | `arij_server`: `/health`, миграции, JWT/Argon2id auth, CRUD проектов и участников; единый формат ошибок |
 | Docker | `docker-compose.yml` с PostgreSQL 16 + сервер, скрипты `scripts/dev-*.ps1`, `docs/local-dev.md` |
 | Issues | 10 открытых, размечены labels и milestones |
-| Документы | `docs/MVP.md`, `docs/ROADMAP.md`, `docs/architecture.md`, ADR-0001, OpenAPI 3.1, отчёт `docs/reports/stage-0.md` |
+| Документы | `docs/MVP.md`, `docs/ROADMAP.md`, `docs/architecture.md`, ADR-0001, OpenAPI 3.1, отчёты `docs/reports/stage-0.md`, `stage-1.md` |
 
-**Главный разрыв:** фундамент готов (контракт, каркас сервера, Docker, CI), но
-продуктовой части (реальная авторизация, проекты, задачи) ещё нет. Критический путь —
-сквозной сценарий этапа 1.
+**Главный разрыв:** этап 1 завершён — реальная авторизация и проекты работают
+через REST API и PostgreSQL. Следующий критический путь — задачи, иерархия
+Epic/Task/Subtask и Backlog (этап 2).
 
 ## 2. Принципы
 
@@ -36,7 +36,7 @@
 | Этап | Ветка | Срок | Результат | Статус |
 |---|---|---|---|---|
 | 0. Фундамент | `feature/stage-0-foundation` | 16–21 ноября | чистый репозиторий, ADR, OpenAPI, `server/`, Docker, backend CI | завершён |
-| 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | в работе |
+| 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | завершён |
 | 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | запланирован |
 | 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | запланирован |
 | 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | запланирован |
@@ -305,3 +305,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 1 | влиты auth (Argon2id + JWT) и PostgreSQL service в CI; обновлена контрольная точка `docs/reports/stage-1-checkpoint.md` | `dd0bb21` |
 | 21.11.2026 | 1 | влиты проекты/участники и аудит зависимостей; роуты подключены; e2e через Docker пройден, CI зелёный | `6344967` |
 | 21.11.2026 | 1 | влит клиентский слой (dio, secure storage, Riverpod, экраны); все проверки зелёные | `a18edf8` |
+| 21.11.2026 | 1 | этап 1 влит в `main` после зелёного CI (`ebff6de`), PR #21 | `5606cfc` |
