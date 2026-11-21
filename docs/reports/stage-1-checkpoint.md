@@ -39,6 +39,11 @@
 - CI на `e217073` зелёный по всем job. По логам `backend` подтверждено:
   `test/db/migrations_integration_test.dart: applies migrations to a live
   PostgreSQL` выполнен без `Skip`, сервис PostgreSQL 16 стартовал.
+- Живой e2e-сценарий на Docker с финальной сборкой сервера:
+  register → 201; создание проекта → 201; список и чтение → 200;
+  добавление участника → 201; попытка участника изменить проект → 403
+  `forbidden`; дубль key → 409 `project_key_taken`; удаление участника → 204;
+  `/health` → 200. Контур остановлен через `compose down -v`.
 
 ## Осталось в этапе 1
 
