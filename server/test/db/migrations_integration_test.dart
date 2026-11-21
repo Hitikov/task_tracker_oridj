@@ -1,15 +1,19 @@
+import 'dart:io';
+
 import 'package:arij_server/src/config/app_config.dart';
 import 'package:arij_server/src/db/database.dart';
 import 'package:arij_server/src/db/migration_runner.dart';
 import 'package:test/test.dart';
 
 Map<String, String> _environment() => <String, String>{
-  'DB_HOST': 'localhost',
-  'DB_PORT': '5432',
-  'DB_NAME': 'arij_test',
-  'DB_USER': 'arij',
-  'DB_PASSWORD': 'arij_test_password',
-  'JWT_SECRET': 'test-secret-that-is-at-least-32-chars',
+  'DB_HOST': Platform.environment['DB_HOST'] ?? 'localhost',
+  'DB_PORT': Platform.environment['DB_PORT'] ?? '5432',
+  'DB_NAME': Platform.environment['DB_NAME'] ?? 'arij_test',
+  'DB_USER': Platform.environment['DB_USER'] ?? 'arij',
+  'DB_PASSWORD': Platform.environment['DB_PASSWORD'] ?? 'arij_test_password',
+  'JWT_SECRET':
+      Platform.environment['JWT_SECRET'] ??
+      'test-secret-that-is-at-least-32-chars',
 };
 
 Future<bool> _databaseAvailable() async {
