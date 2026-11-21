@@ -1,5 +1,5 @@
 ; Inno Setup — установщик Arij для Windows.
-; Собирается в CI: iscc arij.iss /DAppVersion=<версия> /DSourceDir=<папка Release> /DOutputDir=dist
+; Собирается в CI: iscc arij.iss /DMyAppVersion=<версия> /DSourceDir=<папка Release> /DOutputDir=dist
 
 #ifndef MyAppVersion
   #define MyAppVersion "2.0.0"
