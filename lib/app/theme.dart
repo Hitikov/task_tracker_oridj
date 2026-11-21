@@ -13,6 +13,7 @@ ThemeData buildArijTheme() {
   return ThemeData(
     colorScheme: colorScheme,
     useMaterial3: true,
+    visualDensity: VisualDensity.adaptivePlatformDensity,
     scaffoldBackgroundColor: colorScheme.surface,
     appBarTheme: AppBarTheme(
       backgroundColor: colorScheme.primary,
@@ -20,8 +21,17 @@ ThemeData buildArijTheme() {
       elevation: 0,
       centerTitle: false,
     ),
-    inputDecorationTheme: const InputDecorationTheme(
-      border: OutlineInputBorder(),
+    inputDecorationTheme: InputDecorationTheme(
+      border: const OutlineInputBorder(),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      isDense: true,
+    ),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    snackBarTheme: const SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(

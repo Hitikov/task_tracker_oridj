@@ -116,7 +116,9 @@ class _BoardView extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final columnWidth = constraints.maxWidth < 720
-            ? 280.0
+            // На телефоне колонка занимает почти всю ширину экрана —
+            // горизонтальная прокрутка остаётся только между статусами.
+            ? (constraints.maxWidth - 24).clamp(240.0, 420.0).toDouble()
             : (constraints.maxWidth / columns.length)
                 .clamp(280.0, 360.0)
                 .toDouble();

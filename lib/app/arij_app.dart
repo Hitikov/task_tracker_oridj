@@ -29,6 +29,19 @@ class ArijApp extends ConsumerWidget {
       title: 'Arij',
       debugShowCheckedModeBanner: false,
       theme: buildArijTheme(),
+      // Ограничиваем масштаб системного шрифта: на Android с крупным
+      // textScaleFactor длинные строки иначе вылезают за карточки.
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        final scaled = media.textScaler.clamp(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.25,
+        );
+        return MediaQuery(
+          data: media.copyWith(textScaler: scaled),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: authenticatedUser != null
           ? HomePage(
               login: authenticatedUser.email,

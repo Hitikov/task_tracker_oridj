@@ -47,23 +47,30 @@ class AppSidebar extends StatelessWidget {
                     size: 28,
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Arij',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Arij',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Трекер задач',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        Text(
+                          'Трекер задач',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -90,7 +97,7 @@ class AppSidebar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                subtitle: const Text('Демо-пользователь'),
+                subtitle: const Text('Пользователь'),
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,

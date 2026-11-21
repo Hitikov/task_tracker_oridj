@@ -9,6 +9,7 @@ import 'package:task_tracker_oridj/app/arij_app.dart';
 import 'package:task_tracker_oridj/models/project.dart';
 import 'package:task_tracker_oridj/models/task.dart';
 import 'package:task_tracker_oridj/pages/backlog_page.dart';
+import 'package:task_tracker_oridj/pages/home_page.dart';
 import 'package:task_tracker_oridj/pages/kanban_page.dart';
 import 'package:task_tracker_oridj/pages/projects_page.dart';
 import 'package:task_tracker_oridj/repositories/task_repository.dart';
@@ -389,6 +390,69 @@ void main() {
 
       expect(find.text('Ошибка доски'), findsOneWidget);
       expect(find.text('Повторить'), findsOneWidget);
+    });
+  });
+
+  group('адаптивная вёрстка', () {
+    late AppDatabase db;
+    late PersonController personController;
+
+    setUp(() {
+      db = AppDatabase(NativeDatabase.memory());
+      personController = PersonController(PersonRepository(db));
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    testWidgets('ширину бокового меню можно менять перетаскиванием',
+        (tester) async {
+      _set1500x800(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: HomePage(
+              login: 'user@example.com',
+              personController: personController,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final panel = find.byKey(const Key('sidebar-panel'));
+      final handle = find.byKey(const Key('sidebar-resize-handle'));
+      expect(panel, findsOneWidget);
+      expect(handle, findsOneWidget);
+
+      final before = tester.widget<SizedBox>(panel).width;
+      await tester.drag(handle, const Offset(80, 0));
+      await tester.pumpAndSettle();
+      final after = tester.widget<SizedBox>(panel).width;
+
+      expect(after, greaterThan(before!));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('узкий экран 400x800 без overflow', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authSessionProvider.overrideWith(() => FakeAuthSession()),
+          ],
+          child: ArijApp(personController: personController),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Вход в Arij'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }
