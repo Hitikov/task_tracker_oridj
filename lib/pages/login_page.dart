@@ -135,7 +135,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final session = ref.watch(authSessionProvider);
     final isLoading = _submitting;
     final errorText = _sessionErrorText();
 
