@@ -12,12 +12,15 @@ import 'http/request_id.dart';
 import 'http/request_logging.dart';
 import 'middleware/auth_middleware.dart';
 import 'repositories/project_repository.dart';
+import 'repositories/task_repository.dart';
 import 'repositories/user_repository.dart';
 import 'routes/auth_routes.dart';
 import 'routes/health_routes.dart';
 import 'routes/project_routes.dart';
+import 'routes/task_routes.dart';
 import 'services/auth_service.dart';
 import 'services/project_service.dart';
+import 'services/task_service.dart';
 
 /// Builds the HTTP handler for the Arij API.
 ///
@@ -56,6 +59,9 @@ Handler buildHandler({
     repository: projectRepository,
   );
   late final ProjectRoutes projectRoutes = ProjectRoutes(projectService);
+  late final TaskRepository taskRepository = PostgresTaskRepository(database);
+  late final TaskService taskService = TaskService(repository: taskRepository);
+  late final TaskRoutes taskRoutes = TaskRoutes(taskService);
   late final Middleware projectAuth = authMiddleware(
     jwtSecret: jwtSecret ?? resolvedConfig.jwtSecret,
     repository: repository,
@@ -117,6 +123,34 @@ Handler buildHandler({
         ..delete(
           '/api/v1/projects/<id>/members/<userId>',
           (Request request) => projectAuth(projectRoutes.removeMember)(request),
+        )
+        ..get(
+          '/api/v1/projects/<id>/tasks',
+          (Request request) => projectAuth(taskRoutes.list)(request),
+        )
+        ..post(
+          '/api/v1/projects/<id>/tasks',
+          (Request request) => projectAuth(taskRoutes.create)(request),
+        )
+        ..get(
+          '/api/v1/tasks/<id>',
+          (Request request) => projectAuth(taskRoutes.getById)(request),
+        )
+        ..patch(
+          '/api/v1/tasks/<id>',
+          (Request request) => projectAuth(taskRoutes.update)(request),
+        )
+        ..delete(
+          '/api/v1/tasks/<id>',
+          (Request request) => projectAuth(taskRoutes.delete)(request),
+        )
+        ..get(
+          '/api/v1/projects/<id>/task-types',
+          (Request request) => projectAuth(taskRoutes.listTypes)(request),
+        )
+        ..get(
+          '/api/v1/projects/<id>/statuses',
+          (Request request) => projectAuth(taskRoutes.listStatuses)(request),
         );
 
   return const Pipeline()
