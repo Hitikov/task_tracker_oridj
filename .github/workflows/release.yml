@@ -241,10 +241,10 @@ jobs:
           echo "ANDROID_SIGNING=release" >> "$GITHUB_ENV"
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://144.31.170.81' }}
 
       - name: Build AAB
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://144.31.170.81' }}
 
       - name: Package artifacts
         run: |
@@ -291,7 +291,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows release
-        run: flutter build windows --release
+        run: flutter build windows --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://144.31.170.81' }}
 
       - name: Package release
         shell: pwsh
