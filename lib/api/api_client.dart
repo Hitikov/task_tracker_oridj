@@ -105,6 +105,63 @@ class ApiClient {
       throw e.asApiException();
     }
   }
+
+  // --- Задачи (этап 2) -------------------------------------------------
+
+  /// `GET /api/v1/projects/{projectId}/tasks` с опциональными query-фильтрами.
+  Future<List<Map<String, dynamic>>> getProjectTasks(
+    String projectId, {
+    Map<String, String>? query,
+  }) {
+    return getList(_withQuery('/api/v1/projects/$projectId/tasks', query));
+  }
+
+  /// `POST /api/v1/projects/{projectId}/tasks`.
+  Future<Map<String, dynamic>> createProjectTask(
+    String projectId, {
+    required Map<String, dynamic> body,
+  }) {
+    return post('/api/v1/projects/$projectId/tasks', body: body);
+  }
+
+  /// `GET /api/v1/tasks/{id}`.
+  Future<Map<String, dynamic>> getTask(String id) => get('/api/v1/tasks/$id');
+
+  /// `PATCH /api/v1/tasks/{id}`.
+  Future<Map<String, dynamic>> patchTask(
+    String id, {
+    required Map<String, dynamic> body,
+  }) {
+    return patch('/api/v1/tasks/$id', body: body);
+  }
+
+  /// `DELETE /api/v1/tasks/{id}`.
+  Future<Map<String, dynamic>> deleteTask(String id) =>
+      delete('/api/v1/tasks/$id');
+
+  /// `GET /api/v1/projects/{projectId}/task-types`.
+  Future<List<Map<String, dynamic>>> getProjectTaskTypes(String projectId) =>
+      getList('/api/v1/projects/$projectId/task-types');
+
+  /// `GET /api/v1/projects/{projectId}/statuses`.
+  Future<List<Map<String, dynamic>>> getProjectStatuses(String projectId) =>
+      getList('/api/v1/projects/$projectId/statuses');
+
+  /// `GET /api/v1/projects/{projectId}/members`.
+  Future<List<Map<String, dynamic>>> getProjectMembers(String projectId) =>
+      getList('/api/v1/projects/$projectId/members');
+
+  /// Добавляет query-параметры к пути (пустые значения игнорируются).
+  String _withQuery(String path, Map<String, String>? query) {
+    if (query == null || query.isEmpty) return path;
+    final entries =
+        query.entries.where((e) => e.value.isNotEmpty).toList(growable: false);
+    if (entries.isEmpty) return path;
+    final uri = Uri(path: path, queryParameters: {
+      for (final entry in entries) entry.key: entry.value,
+    });
+    return uri.toString();
+  }
 }
 
 /// Перехватчик, прикладывающий `Authorization: Bearer <токен>`.
