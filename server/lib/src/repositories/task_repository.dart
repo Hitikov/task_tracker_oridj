@@ -119,7 +119,7 @@ class PostgresTaskRepository implements TaskRepository {
 
   static const String _typeColumns = 'id, project_id, name';
   static const String _statusColumns =
-      'id, project_id, name, key, position, is_default';
+      'id, project_id, name, position, is_default';
 
   /// Maps a `ResultRow` to a plain map of column values.
   ///
@@ -344,7 +344,7 @@ class PostgresTaskRepository implements TaskRepository {
   Future<List<TaskType>> listTaskTypes(String projectId) async {
     final result = await _db.query(
       'SELECT $_typeColumns FROM task_types WHERE project_id = \$1 '
-      'ORDER BY position, name',
+      'ORDER BY name',
       parameters: <Object?>[projectId],
     );
     return <TaskType>[

@@ -18,7 +18,10 @@ class Status {
       id: row['id'] as String,
       projectId: row['project_id'] as String,
       name: row['name'] as String,
-      key: row['key'] as String,
+      // В БД statuses нет отдельной колонки key — код выводим из названия.
+      key:
+          row['key'] as String? ??
+          (row['name'] as String).toLowerCase().replaceAll(RegExp(r'\s+'), '_'),
       position: row['position'] as int,
       isDefault: row['is_default'] as bool,
     );
