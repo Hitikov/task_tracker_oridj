@@ -31,13 +31,18 @@ import 'services/auth_service.dart';
 /// wiring is lazy — [AppConfig] is loaded from the environment only when an
 /// auth route is actually hit, so `GET /health` keeps working without env
 /// or a database.
-Handler buildHandler({UserRepository? userRepository, String? jwtSecret}) {
-  late final AppConfig config = AppConfig.fromEnvironment(Platform.environment);
+Handler buildHandler({
+  UserRepository? userRepository,
+  String? jwtSecret,
+  AppConfig? config,
+}) {
+  late final AppConfig resolvedConfig =
+      config ?? AppConfig.fromEnvironment(Platform.environment);
   late final UserRepository repository =
-      userRepository ?? PostgresUserRepository(Database(config));
+      userRepository ?? PostgresUserRepository(Database(resolvedConfig));
   late final AuthService authService = AuthService(
     repository: repository,
-    jwtSecret: jwtSecret ?? config.jwtSecret,
+    jwtSecret: jwtSecret ?? resolvedConfig.jwtSecret,
   );
   // Routes are wrapped in closures: `AuthRoutes(authService)` must not
   // evaluate the lazy service, otherwise `GET /health` in tests would

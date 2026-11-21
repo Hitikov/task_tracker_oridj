@@ -66,7 +66,11 @@ Future<void> main() async {
     _log.warning('APPLY_MIGRATIONS=false: запуск без применения миграций');
   }
 
-  final server = await shelf_io.serve(buildHandler(), config.host, config.port);
+  final server = await shelf_io.serve(
+    buildHandler(config: config),
+    config.host,
+    config.port,
+  );
   server.autoCompress = true;
 
   _log.info(
