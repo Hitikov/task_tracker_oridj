@@ -307,6 +307,26 @@ jobs:
             -Force
           Get-ChildItem $dist | Select-Object Name, Length
 
+      - name: Build Windows installer with desktop shortcut
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $candidate = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+            if (Test-Path $candidate) { $iscc = $candidate }
+          }
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          }
+          $version = "${{ needs.lint.outputs.version }}"
+          & $iscc "installer\windows\arij.iss" `
+            "/DAppVersion=$version" `
+            "/DSourceDir=build\windows\x64\runner\Release" `
+            "/DOutputDir=dist"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          Get-ChildItem dist | Select-Object Name, Length
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v7
         with:
