@@ -93,7 +93,7 @@ class TaskService {
     required String title,
     required String kind,
     required String typeId,
-    required String statusId,
+    String statusId = '',
     required String priority,
     String? description,
     String? assigneeId,
@@ -101,18 +101,21 @@ class TaskService {
     DateTime? dueDate,
   }) async {
     await _ensureAccess(userId, projectId);
+    final effectiveStatusId = statusId.isNotEmpty
+        ? statusId
+        : await _defaultStatusId(projectId);
     _validateCreateInput(
       title: title,
       kind: kind,
       typeId: typeId,
-      statusId: statusId,
+      statusId: effectiveStatusId,
       priority: priority,
       dueDate: dueDate,
     );
     if (await repository.findTaskType(projectId, typeId) == null) {
       throw const ValidationException('typeId');
     }
-    if (await repository.findStatus(projectId, statusId) == null) {
+    if (await repository.findStatus(projectId, effectiveStatusId) == null) {
       throw const ValidationException('statusId');
     }
     await _validateHierarchy(projectId, kind, parentId);
@@ -121,7 +124,7 @@ class TaskService {
       projectId: projectId,
       kind: kind,
       typeId: typeId,
-      statusId: statusId,
+      statusId: effectiveStatusId,
       title: title.trim(),
       description: description?.trim(),
       priority: priority,
@@ -282,6 +285,21 @@ class TaskService {
     if (role == null) {
       throw const ForbiddenException();
     }
+  }
+
+  /// Returns the project's default status id, or its first status.
+  ///
+  /// `TaskCreate.statusId` is optional in OpenAPI: new tasks start in the
+  /// project's default column (`is_default`).
+  Future<String> _defaultStatusId(String projectId) async {
+    final statuses = await repository.listStatuses(projectId);
+    Status? first;
+    for (final status in statuses) {
+      if (status.isDefault) return status.id;
+      first ??= status;
+    }
+    if (first != null) return first.id;
+    throw const ValidationException('statusId');
   }
 
   void _validateCreateInput({

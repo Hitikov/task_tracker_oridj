@@ -74,7 +74,8 @@ class TaskRoutes {
         title: _requiredString(body, 'title'),
         kind: _requiredString(body, 'kind'),
         typeId: _requiredString(body, 'typeId'),
-        statusId: _requiredString(body, 'statusId'),
+        // `statusId` необязателен по OpenAPI: сервер выберет статус по умолчанию.
+        statusId: _optionalString(body, 'statusId') ?? '',
         priority: _requiredString(body, 'priority'),
         description: _optionalString(body, 'description'),
         assigneeId: _optionalString(body, 'assigneeId'),
