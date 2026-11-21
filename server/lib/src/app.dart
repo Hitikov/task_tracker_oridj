@@ -10,10 +10,14 @@ import 'http/error_handler.dart';
 import 'http/json_response.dart';
 import 'http/request_id.dart';
 import 'http/request_logging.dart';
+import 'middleware/auth_middleware.dart';
+import 'repositories/project_repository.dart';
 import 'repositories/user_repository.dart';
 import 'routes/auth_routes.dart';
 import 'routes/health_routes.dart';
+import 'routes/project_routes.dart';
 import 'services/auth_service.dart';
+import 'services/project_service.dart';
 
 /// Builds the HTTP handler for the Arij API.
 ///
@@ -38,11 +42,23 @@ Handler buildHandler({
 }) {
   late final AppConfig resolvedConfig =
       config ?? AppConfig.fromEnvironment(Platform.environment);
+  late final Database database = Database(resolvedConfig);
   late final UserRepository repository =
-      userRepository ?? PostgresUserRepository(Database(resolvedConfig));
+      userRepository ?? PostgresUserRepository(database);
   late final AuthService authService = AuthService(
     repository: repository,
     jwtSecret: jwtSecret ?? resolvedConfig.jwtSecret,
+  );
+  late final ProjectRepository projectRepository = PostgresProjectRepository(
+    database,
+  );
+  late final ProjectService projectService = ProjectService(
+    repository: projectRepository,
+  );
+  late final ProjectRoutes projectRoutes = ProjectRoutes(projectService);
+  late final Middleware projectAuth = authMiddleware(
+    jwtSecret: jwtSecret ?? resolvedConfig.jwtSecret,
+    repository: repository,
   );
   // Routes are wrapped in closures: `AuthRoutes(authService)` must not
   // evaluate the lazy service, otherwise `GET /health` in tests would
@@ -69,6 +85,38 @@ Handler buildHandler({
         ..get(
           '/api/v1/auth/me',
           (Request request) => AuthRoutes(authService).me(request),
+        )
+        ..get(
+          '/api/v1/projects',
+          (Request request) => projectAuth(projectRoutes.list)(request),
+        )
+        ..post(
+          '/api/v1/projects',
+          (Request request) => projectAuth(projectRoutes.create)(request),
+        )
+        ..get(
+          '/api/v1/projects/<id>',
+          (Request request) => projectAuth(projectRoutes.getById)(request),
+        )
+        ..patch(
+          '/api/v1/projects/<id>',
+          (Request request) => projectAuth(projectRoutes.update)(request),
+        )
+        ..delete(
+          '/api/v1/projects/<id>',
+          (Request request) => projectAuth(projectRoutes.delete)(request),
+        )
+        ..get(
+          '/api/v1/projects/<id>/members',
+          (Request request) => projectAuth(projectRoutes.listMembers)(request),
+        )
+        ..post(
+          '/api/v1/projects/<id>/members',
+          (Request request) => projectAuth(projectRoutes.addMember)(request),
+        )
+        ..delete(
+          '/api/v1/projects/<id>/members/<userId>',
+          (Request request) => projectAuth(projectRoutes.removeMember)(request),
         );
 
   return const Pipeline()
