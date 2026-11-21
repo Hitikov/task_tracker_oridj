@@ -50,12 +50,10 @@ echo "==> Получение исходников Arij"
 if [[ ! -d task_tracker_oridj/.git ]]; then
   git clone --depth 1 -b feature/stage-4-mvp-polish \
     https://github.com/Hitikov/task_tracker_oridj.git
-else
-  cd task_tracker_oridj
-  git fetch origin feature/stage-4-mvp-polish
-  git reset --hard origin/feature/stage-4-mvp-polish
 fi
 cd task_tracker_oridj
+git fetch origin feature/stage-4-mvp-polish
+git reset --hard origin/feature/stage-4-mvp-polish
 
 echo "==> Запуск прод-контура (postgres + server + caddy)"
 bash deploy/deploy.sh "$TARGET"
