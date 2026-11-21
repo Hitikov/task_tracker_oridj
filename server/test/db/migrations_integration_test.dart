@@ -5,6 +5,8 @@ import 'package:arij_server/src/db/database.dart';
 import 'package:arij_server/src/db/migration_runner.dart';
 import 'package:test/test.dart';
 
+import 'ensure_migrations.dart';
+
 Map<String, String> _environment() => <String, String>{
   'DB_HOST': Platform.environment['DB_HOST'] ?? 'localhost',
   'DB_PORT': Platform.environment['DB_PORT'] ?? '5432',
@@ -38,8 +40,14 @@ Future<void> main() async {
       final database = Database(AppConfig.fromEnvironment(environment));
       await database.open();
       try {
-        final applied = await applyMigrations(database, migrationsDirectory());
-        expect(applied, isNotEmpty);
+        // Другие интеграционные тесты могут применить миграции первыми —
+        // проверяем итоговое состояние, а не то, что этот вызов что-то изменил.
+        await ensureMigrations(database);
+        final applied = await appliedMigrations(database);
+        expect(
+          applied.toSet(),
+          containsAll(discoverMigrations(migrationsDirectory())),
+        );
       } finally {
         await database.close();
       }
