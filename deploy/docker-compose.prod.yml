@@ -52,7 +52,7 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env or pass it to deploy.sh}
+      SITE_ADDR: ${SITE_ADDR:?set SITE_ADDR in .env or pass domain/IP to deploy.sh}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./www:/srv:ro

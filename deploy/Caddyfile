@@ -1,4 +1,4 @@
-{$DOMAIN} {
+{$SITE_ADDR} {
 	encode gzip
 
 	# REST API и health-check проксируются на Dart-сервер.
