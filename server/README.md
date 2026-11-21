@@ -1,15 +1,15 @@
 # Arij Server
 
 Серверная часть Arij на Dart и [shelf](https://pub.dev/packages/shelf).
-На этапе 0 пакет содержит только фундамент: конфигурацию, HTTP-конвейер
-(логирование, CORS, единый формат ошибок), `GET /health` и graceful shutdown.
-PostgreSQL на этом этапе не подключается — соединение и миграции появятся на
-этапе 1.
+На этапе 1 сервер подключается к PostgreSQL и применяет SQL-миграции при
+старте. `GET /health` не требует аутентификации и не обращается к БД.
 
 ## Требования
 
 - Dart SDK `>=3.9.0 <4.0.0`.
 - Docker — только для сборки образа; для локального запуска не нужен.
+- PostgreSQL (этап 1) — требуется при запуске по умолчанию;
+  `APPLY_MIGRATIONS=false` отключает БД.
 
 ## Быстрый старт
 
@@ -34,7 +34,24 @@ curl http://localhost:8080/health
 }
 ```
 
-Остановка — `Ctrl+C` (SIGINT); на Linux/macOS обрабатывается и SIGTERM.
+При первом запуске сервер применяет миграции — создаёт таблицы `users`,
+`projects`, `project_members` (и `schema_migrations`).
+
+Остановка — `Ctrl+C` (SIGINT).
+
+## Миграции
+
+Файлы `migrations/NNNN_name.sql` — единственный способ менять схему БД.
+Они лежат вне `lib/`, чтобы их можно было монтировать/копировать в Docker
+и применять отдельной командой в CI.
+
+- Имена соответствуют формату `NNNN_name.sql`; номера без пропусков и
+  дублей (проверяется при каждом запуске сервера).
+- Применяются только вперёд; идемпотентно — повторный запуск сервера
+  безопасен.
+- Уже применённые записываются в таблице `schema_migrations`.
+- Ручное применение: перезапустите сервер — он применит только
+  неприменённые миграции.
 
 ## Переменные окружения
 
@@ -46,15 +63,18 @@ curl http://localhost:8080/health
 |---|---|---|---|
 | `SERVER_HOST` | нет | `0.0.0.0` | адрес, который слушает сервер |
 | `SERVER_PORT` | нет | `8080` | порт сервера (1–65535) |
-| `DB_HOST` | да | — | хост PostgreSQL (на этапе 0 не используется для подключения) |
-| `DB_PORT` | да | — | порт PostgreSQL (1–65535) |
-| `DB_NAME` | да | — | имя базы |
-| `DB_USER` | да | — | пользователь базы |
-| `DB_PASSWORD` | да | — | пароль пользователя базы |
+| `DB_HOST` | да | — | хост PostgreSQL (этап 1: сервер подключается к БД) |
+| `DB_PORT` | да | — | порт PostgreSQL (этап 1) |
+| `DB_NAME` | да | — | имя базы (этап 1) |
+| `DB_USER` | да | — | пользователь базы (этап 1) |
+| `DB_PASSWORD` | да | — | пароль пользователя базы (этап 1) |
 | `JWT_SECRET` | да | — | секрет подписи JWT, не короче 32 символов |
+| `MIGRATIONS_DIR` | нет | каталог `migrations` рядом с исполняемым файлом | каталог с SQL-миграциями |
+| `APPLY_MIGRATIONS` | нет | `true` | применять миграции при старте (`false` — без БД) |
 
-Все переменные валидируются при старте. При ошибке сервер печатает список
-проблем и завершается с кодом `78` (EX_CONFIG), не раскрывая значения секретов.
+При ошибке конфигурации сервер печатает список проблем и завершается с
+кодом `78` (EX_CONFIG); при ошибке подключения к БД или применения
+миграций — с кодом `1`.
 
 Пример `server/.env`:
 
@@ -78,8 +98,9 @@ dart analyze
 dart test
 ```
 
-Тесты не требуют сети и PostgreSQL: handler вызывается напрямую через
-`shelf.Request`.
+Юнит-тесты не требуют PostgreSQL. Интеграционный тест применения миграций
+к живой БД (`test/db/migrations_integration_test.dart`) пропускается без
+доступной БД.
 
 ## Docker
 
@@ -91,22 +112,32 @@ docker run --rm -p 8080:8080 --env-file .env arij-server
 
 Образ multi-stage: `dart:stable` собирает AOT-исполняемый файл, runtime —
 `debian:bookworm-slim` с `curl` для `HEALTHCHECK` на `/health`. Процесс
-запускается от непривилегированного пользователя `arij`.
+запускается от непривилегированного пользователя `arij`. В runtime
+пробрасываются `migrations/` (`ENV MIGRATIONS_DIR=/app/migrations`) — сервер
+применяет их при старте.
 
 ## Структура
 
 ```text
 server/
-├── bin/server.dart              # точка входа: env, запуск, graceful shutdown
+├── migrations/
+│   ├── 0000_schema_migrations.sql
+│   ├── 0001_users.sql
+│   ├── 0002_projects.sql
+│   └── 0003_project_members.sql
+├── bin/server.dart                 # точка входа: env, пул, миграции, запуск
 ├── lib/
-│   ├── arij_server.dart         # публичный экспорт buildHandler/AppConfig
+│   ├── arij_server.dart
 │   └── src/
-│       ├── app.dart             # Router + Pipeline
+│       ├── app.dart
 │       ├── config/app_config.dart
-│       ├── http/                # JSON, ошибки, CORS, request id, логирование
+│       ├── db/
+│       │   ├── database.dart
+│       │   └── migration_runner.dart
+│       ├── http/
 │       ├── routes/health_routes.dart
 │       └── version.dart
-├── test/                        # тесты конфигурации и HTTP-конвейера
+├── test/                            # тесты конфигурации, пула и миграций
 ├── Dockerfile
 └── pubspec.yaml
 ```
