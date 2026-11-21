@@ -56,7 +56,8 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Войти'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Введите логин и пароль'), findsOneWidget);
+    expect(find.text('Введите email'), findsOneWidget);
+    expect(find.text('Введите пароль'), findsOneWidget);
   });
 
   testWidgets('неверные данные не пускают в приложение', (tester) async {
@@ -64,12 +65,12 @@ void main() {
       tester,
       session: FakeAuthSession(
         loginResponder: (email, password) async =>
-            password == 'secret' ? null : fakeUser(email),
+            password == 'wrongpass' ? null : fakeUser(email),
       ),
     );
 
-    await tester.enterText(find.byType(TextField).at(0), 'demo_user');
-    await tester.enterText(find.byType(TextField).at(1), 'secret');
+    await tester.enterText(find.byType(TextField).at(0), 'demo@example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'wrongpass');
     await tester.tap(find.widgetWithText(FilledButton, 'Войти'));
     await tester.pumpAndSettle();
 

@@ -686,7 +686,18 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
       helpText: 'Выберите дедлайн',
     );
     if (picked != null) {
-      setState(() => _dueDate = picked);
+      // Дата без времени означала бы полночь — сервер счёл бы сегодняшний
+      // дедлайн уже просроченным. Используем конец выбранного дня.
+      setState(
+        () => _dueDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          23,
+          59,
+          59,
+        ),
+      );
     }
   }
 

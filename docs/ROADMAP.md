@@ -39,7 +39,7 @@
 | 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | завершён |
 | 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | завершён |
 | 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | завершён |
-| 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | запланирован |
+| 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | в работе |
 | 5. Релиз 2.0.0 | `feature/stage-5-release-2.0.0` | 20–26 декабря | APK/AAB/Windows/Web, подпись, GitHub Release | запланирован |
 
 Буфер: 27–31 декабря — исправление ошибок по итогам демо, без новых функций.
@@ -312,3 +312,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 3 | создана ветка `feature/stage-3-kanban`, начата работа над доской | `feature/stage-3-kanban` |
 | 21.11.2026 | 3 | влиты API доски и клиентский Kanban; e2e To Do → Done и сохранение после рестарта; отчёт `docs/reports/stage-3.md` | `b84426e` |
 | 21.11.2026 | 3 | этап 3 влит в `main` после зелёного CI, PR #26 | `cb8ea1f` |
+| 21.11.2026 | 4 | создана ветка `feature/stage-4-mvp-polish`, начата полировка MVP | `feature/stage-4-mvp-polish` |

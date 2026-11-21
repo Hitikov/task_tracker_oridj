@@ -25,67 +25,97 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  final TextEditingController _loginController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _loginController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _submitting = false;
 
-  /// Текст ошибки ввода (валидация полей, локальный вход).
-  /// null — блок ошибки скрыт.
-  String? _authError;
-
-  @override
-  void initState() {
-    super.initState();
-    // Как только пользователь начал что-то править — прячем старую ошибку.
-    _loginController.addListener(_clearAuthError);
-    _passwordController.addListener(_clearAuthError);
-  }
+  static final RegExp _emailRegExp = RegExp(
+    r'^[\w.!#$%&’*+/=?^`{|}~-]+@[\w-]+(\.[\w-]+)+$',
+  );
 
   @override
   void dispose() {
-    _loginController.removeListener(_clearAuthError);
-    _passwordController.removeListener(_clearAuthError);
     _loginController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _clearAuthError() {
-    if (_authError != null) {
-      setState(() => _authError = null);
+  String? _validateLogin(String? value) {
+    final login = value?.trim() ?? '';
+    if (login.isEmpty) {
+      return 'Введите email';
     }
+    if (login == demoLogin) {
+      return null;
+    }
+    if (!_emailRegExp.hasMatch(login)) {
+      return 'Некорректный email';
+    }
+    return null;
   }
 
-  void _onSubmit() {
+  String? _validatePassword(String? value) {
+    final password = value ?? '';
+    if (password.isEmpty) {
+      return 'Введите пароль';
+    }
+    if (_loginController.text.trim() == demoLogin && password == demoPassword) {
+      return null;
+    }
+    if (password.length < 8) {
+      return 'Минимум 8 символов';
+    }
+    if (password.length > 128) {
+      return 'Максимум 128 символов';
+    }
+    return null;
+  }
+
+  Future<void> _onSubmit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     final login = _loginController.text.trim();
     final password = _passwordController.text;
     final status = checkDemoCredentials(login: login, password: password);
 
-    switch (status) {
-      case DemoAuthStatus.emptyFields:
-        setState(() => _authError = 'Введите логин и пароль');
-        return;
-      case DemoAuthStatus.invalidCredentials:
-        // В реальном режиме пробуем сервер — он решит.
-        break;
-      case DemoAuthStatus.success:
-        if (widget.demoMode) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute<void>(
-              builder: (_) => HomePage(
-                login: login,
-                personController: widget.personController,
-              ),
-            ),
-          );
-          return;
-        }
+    if (status == DemoAuthStatus.success && widget.demoMode) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => HomePage(
+            login: login,
+            personController: widget.personController,
+          ),
+        ),
+      );
+      return;
     }
 
-    setState(() => _authError = null);
-    ref
-        .read(authSessionProvider.notifier)
-        .login(email: login, password: password);
+    setState(() => _submitting = true);
+    try {
+      final user = await ref
+          .read(authSessionProvider.notifier)
+          .login(email: login, password: password);
+      if (!mounted || user == null) return;
+      // Явная навигация: смена `MaterialApp.home` не гарантирует переход,
+      // если Navigator уже создан.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => HomePage(
+            login: login,
+            personController: widget.personController,
+            demoMode: widget.demoMode,
+          ),
+        ),
+      );
+    } catch (_) {
+      // Ошибка отображается из состояния сессии.
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   Future<void> _openRegistration() async {
@@ -97,13 +127,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       return;
     }
 
-    // Возвращаемся на экран входа с уже заполненным логином.
     _loginController.text = registeredLogin;
     _passwordController.clear();
-    setState(() => _authError = null);
+    setState(() {});
   }
 
-  /// Ошибка сессии для показа пользователю.
   String? _sessionErrorText() {
     final session = ref.watch(authSessionProvider);
     final error = session.error;
@@ -119,6 +147,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLoading = _submitting;
+    final errorText = _sessionErrorText();
 
     return Scaffold(
       body: Center(
@@ -127,94 +157,115 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
             child: AutofillGroup(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(
-                    Icons.task_alt,
-                    size: 56,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Arij',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(
+                      Icons.task_alt,
+                      size: 56,
                       color: theme.colorScheme.primary,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Трекер задач для командной работы',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Text(
-                    'Вход в Arij',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _loginController,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.username],
-                    decoration: const InputDecoration(
-                      labelText: 'Логин',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    autofillHints: const [AutofillHints.password],
-                    onSubmitted: (_) => _onSubmit(),
-                    decoration: InputDecoration(
-                      labelText: 'Пароль',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        tooltip: _obscurePassword ? 'Показать' : 'Скрыть',
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
+                    const SizedBox(height: 12),
+                    Text(
+                      'Arij',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: _openRegistration,
-                      child: const Text('Зарегистрироваться'),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Трекер задач для командной работы',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  FilledButton(
-                    onPressed: _onSubmit,
-                    child: const Text('Войти'),
-                  ),
-                  _AuthErrorBanner(message: _authError ?? _sessionErrorText()),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Демо-вход: логин и пароль — $demoLogin (только DEMO_MODE).',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 32),
+                    Text(
+                      'Вход в Arij',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineSmall,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _loginController,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.username],
+                      keyboardType: TextInputType.emailAddress,
+                      validator: _validateLogin,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                        helperText: ' ',
+                        errorMaxLines: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.password],
+                      validator: _validatePassword,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onFieldSubmitted: (_) => isLoading ? null : _onSubmit(),
+                      decoration: InputDecoration(
+                        labelText: 'Пароль',
+                        border: const OutlineInputBorder(),
+                        helperText: ' ',
+                        errorMaxLines: 2,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          tooltip: _obscurePassword ? 'Показать' : 'Скрыть',
+                          onPressed: () {
+                            setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: isLoading ? null : _openRegistration,
+                        child: const Text('Зарегистрироваться'),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FilledButton.icon(
+                      onPressed: isLoading ? null : _onSubmit,
+                      icon: isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.login),
+                      label: Text(isLoading ? 'Вход…' : 'Войти'),
+                    ),
+                    _AuthErrorBanner(message: errorText),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Демо-вход: логин и пароль — $demoLogin (только DEMO_MODE).',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -246,6 +297,7 @@ class _AuthErrorBanner extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
               Icons.error_outline,
@@ -256,8 +308,6 @@ class _AuthErrorBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 message!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: colors.onErrorContainer),
               ),
             ),

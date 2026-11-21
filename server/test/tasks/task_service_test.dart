@@ -428,25 +428,19 @@ void main() {
       },
     );
 
-    test('empty statusId → 400 validation_error field=statusId', () async {
-      await expectLater(
-        service.createTask(
-          userId: ownerId,
-          projectId: projectId,
-          title: 'T',
-          kind: 'task',
-          typeId: typeId,
-          statusId: '',
-          priority: 'low',
-        ),
-        throwsA(
-          isA<ValidationException>().having(
-            (e) => e.field,
-            'field',
-            'statusId',
-          ),
-        ),
+    test('empty statusId uses the project default status', () async {
+      // OpenAPI TaskCreate.statusId is optional: the server picks the
+      // project's default column instead of rejecting the request.
+      final task = await service.createTask(
+        userId: ownerId,
+        projectId: projectId,
+        title: 'T',
+        kind: 'task',
+        typeId: typeId,
+        statusId: '',
+        priority: 'low',
       );
+      expect(task.statusId, 'status-00000000-0000-4000-8000-000000000400');
     });
 
     test('dueDate in the past → 400 validation_error field=dueDate', () async {

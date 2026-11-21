@@ -62,7 +62,7 @@ class AuthSession extends AsyncNotifier<User?> {
     required String name,
   }) async {
     final repository = ref.read(authRepositoryProvider);
-    state = AsyncValue.loading();
+    state = const AsyncValue<User?>.loading();
     try {
       final response = await repository.register(
         email: email,
@@ -72,9 +72,10 @@ class AuthSession extends AsyncNotifier<User?> {
       // После регистрации пользователь остаётся на экране входа: экран входа
       // покажет диалог «Вы зарегистрированы», а кнопка «Перейти ко входу»
       // вернёт email на экран входа (см. [RegisterPage]).
+      state = const AsyncValue<User?>.data(null);
       return response.user;
     } on Exception catch (e, stackTrace) {
-      state = AsyncValue.error(e, stackTrace);
+      state = AsyncValue<User?>.error(e, stackTrace);
       rethrow;
     }
   }
