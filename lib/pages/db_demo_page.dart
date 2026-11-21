@@ -8,9 +8,9 @@ import '../database/app_database.dart';
 /// Показывает полный CRUD-цикл над таблицей `Person` через слои
 /// repository → controller. Используется как диагностический экран.
 class DbDemoPage extends StatefulWidget {
-  const DbDemoPage({super.key, required this.personController});
+  const DbDemoPage({super.key, this.personController});
 
-  final PersonController personController;
+  final PersonController? personController;
 
   @override
   State<DbDemoPage> createState() => _DbDemoPageState();
@@ -25,15 +25,23 @@ class _DbDemoPageState extends State<DbDemoPage> {
 
   // --- Демонстрация полного цикла CRUD ---
   Future<void> runDemo() async {
+    final personController = widget.personController;
     setState(() {
       _statusMessage = 'Запуск демо... (1/4: Добавление пользователя)';
       _peopleList.clear();
     });
 
+    if (personController == null) {
+      setState(
+        () => _statusMessage =
+            'Drift-демо недоступен: personController не передан (DEMO_MODE).',
+      );
+      return;
+    }
+
     try {
       // 1. CREATE (Добавить)
-      final newUser =
-          await widget.personController.createPerson('Михаил Сидоров');
+      final newUser = await personController.createPerson('Михаил Сидоров');
       setState(() {
         _statusMessage = 'Успех: Пользователь ${newUser.name} добавлен.';
       });
@@ -45,7 +53,7 @@ class _DbDemoPageState extends State<DbDemoPage> {
         _statusMessage =
             'Загрузка данных... (2/4: Получение списка пользователей)';
       });
-      final peopleList = await widget.personController.getPeople();
+      final peopleList = await personController.getPeople();
       setState(() {
         _peopleList = peopleList;
         _statusMessage =
@@ -61,11 +69,13 @@ class _DbDemoPageState extends State<DbDemoPage> {
         setState(() {
           _statusMessage = 'Изменение данных... (3/4: Обновление)';
         });
-        await widget.personController
-            .updatePerson(personToUpdateId, 'Михаил Сидоров - Обновлено');
+        await personController.updatePerson(
+          personToUpdateId,
+          'Михаил Сидоров - Обновлено',
+        );
 
         // Снова получаем список после обновления для подтверждения.
-        final refreshedPeopleList = await widget.personController.getPeople();
+        final refreshedPeopleList = await personController.getPeople();
         setState(() {
           _peopleList = refreshedPeopleList;
           _statusMessage =
@@ -82,10 +92,10 @@ class _DbDemoPageState extends State<DbDemoPage> {
             _statusMessage = 'Удаление данных... (4/4: Удаление)';
           });
 
-          await widget.personController.deletePerson(idToDelete);
+          await personController.deletePerson(idToDelete);
 
           // Финальная загрузка, исключая удаленного.
-          final finalPeopleList = await widget.personController.getPeople();
+          final finalPeopleList = await personController.getPeople();
           setState(() {
             _peopleList = finalPeopleList;
             _statusMessage = '✅ Демо завершено! Пользователь успешно удален.';

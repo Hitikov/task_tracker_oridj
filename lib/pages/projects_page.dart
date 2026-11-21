@@ -217,7 +217,7 @@ class _CreateProjectDialogState extends ConsumerState<_CreateProjectDialog> {
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(text: 'Проект создан'),
+        const SnackBar(content: Text('Проект создан')),
       );
     } on Exception catch (e) {
       setState(() => _errorText = _errorTextOf(e));
@@ -236,7 +236,7 @@ class _CreateProjectDialogState extends ConsumerState<_CreateProjectDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
+            TextFormField(
               controller: _keyController,
               textInputAction: TextInputAction.next,
               validator: _validateKey,
@@ -248,7 +248,7 @@ class _CreateProjectDialogState extends ConsumerState<_CreateProjectDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
+            TextFormField(
               controller: _nameController,
               textInputAction: TextInputAction.next,
               validator: _validateName,
@@ -262,7 +262,6 @@ class _CreateProjectDialogState extends ConsumerState<_CreateProjectDialog> {
             TextField(
               controller: _descriptionController,
               textInputAction: TextInputAction.done,
-              validator: (value) => null,
               maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Описание',
@@ -280,7 +279,9 @@ class _CreateProjectDialogState extends ConsumerState<_CreateProjectDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Отмена')),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Отмена')),
         FilledButton(onPressed: _submit, child: const Text('Создать')),
       ],
     );

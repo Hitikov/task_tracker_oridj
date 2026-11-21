@@ -16,14 +16,20 @@ class HomePage extends ConsumerStatefulWidget {
   const HomePage({
     super.key,
     required this.login,
-    required this.personController,
+    this.personController,
+    this.demoMode = false,
   });
 
   final String login;
-  final PersonController personController;
+
+  /// Для открытия демо-страницы работы с БД (legacy Drift).
+  final PersonController? personController;
+
+  /// Демо-режим: локальный вход `12345/12345` без сервера.
+  final bool demoMode;
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
@@ -36,7 +42,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _openDbDemo() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => DbDemoPage(personController: widget.personController),
+        builder: (_) => DbDemoPage(
+          personController: widget.personController,
+        ),
       ),
     );
   }
@@ -45,7 +53,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.read(authSessionProvider.notifier).logout();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => LoginPage(),
+        builder: (_) => LoginPage(
+          demoMode: widget.demoMode,
+          personController: widget.personController,
+        ),
       ),
     );
   }

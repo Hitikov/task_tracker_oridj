@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:task_tracker_oridj/auth/auth_repository.dart';
-import 'package:task_tracker_oridj/models/project.dart';
+import 'package:task_tracker_oridj/models/project_create.dart';
 import 'package:task_tracker_oridj/state/auth_providers.dart';
 import 'package:task_tracker_oridj/state/projects_providers.dart';
 
@@ -15,9 +15,9 @@ ProviderContainer _container({
   return ProviderContainer(
     overrides: [
       if (repository != null)
-        authRepositoryProvider.overrideWith((_) => repository),
+        authRepositoryProvider.overrideWith((ref) => repository),
       if (projectsNotifier != null)
-        projectsProvider.overrideWith((_) => projectsNotifier),
+        projectsProvider.overrideWith(() => projectsNotifier),
     ],
   );
 }
@@ -25,7 +25,9 @@ ProviderContainer _container({
 void main() {
   group('AuthSession', () {
     test('build возвращает null без токена', () async {
-      final container = _container();
+      final tokens = FakeTokenStore();
+      final repository = AuthRepository(api: FakeApiClient(), tokens: tokens);
+      final container = _container(repository: repository);
       addTearDown(container.dispose);
 
       final notifier = container.read(authSessionProvider.notifier);
@@ -36,7 +38,8 @@ void main() {
 
     test('build читает текущего пользователя из токена', () async {
       final tokens = FakeTokenStore()..storedToken = 'token-ada@example.com';
-      final repository = AuthRepository(api: FakeApiClient(), tokens: tokens);
+      final api = FakeApiClient(token: 'token-ada@example.com');
+      final repository = AuthRepository(api: api, tokens: tokens);
       final container = _container(repository: repository);
       addTearDown(container.dispose);
 
@@ -104,7 +107,11 @@ void main() {
       final container = _container(projectsNotifier: notifier);
       addTearDown(container.dispose);
 
-      final project = await notifier.createProject(
+      final providerNotifier = container.read(projectsProvider.notifier);
+      // Инициализируем notifier через провайдер, чтобы состояние было готово.
+      await providerNotifier.build();
+
+      final project = await providerNotifier.createProject(
         ProjectCreate(key: 'ARIJ', name: 'Arij MVP'),
       );
 

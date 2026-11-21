@@ -33,8 +33,9 @@ class ArijApp extends ConsumerWidget {
           ? HomePage(
               login: authenticatedUser.email,
               personController: personController,
+              demoMode: demoMode,
             )
-          : LoginPage(demoMode: demoMode),
+          : LoginPage(demoMode: demoMode, personController: personController),
     );
   }
 }

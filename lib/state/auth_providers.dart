@@ -69,7 +69,9 @@ class AuthSession extends AsyncNotifier<User?> {
         password: password,
         name: name,
       );
-      state = AsyncValue.data(response.user);
+      // После регистрации пользователь остаётся на экране входа: экран входа
+      // покажет диалог «Вы зарегистрированы», а кнопка «Перейти ко входу»
+      // вернёт email на экран входа (см. [RegisterPage]).
       return response.user;
     } on Exception catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);

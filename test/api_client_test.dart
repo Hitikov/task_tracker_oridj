@@ -27,7 +27,9 @@ class _FakeAdapter implements HttpClientAdapter {
       jsonEncode(body),
       statusCode,
       statusMessage: 'fake',
-      headers: {'content-type': ['application/json']},
+      headers: {
+        'content-type': ['application/json']
+      },
     );
   }
 
@@ -55,10 +57,11 @@ void main() {
 
       await client.get('/api/v1/projects');
 
-      final headers = adapter.captured.single.headers ?? {};
+      final headers = adapter.captured.single.headers;
       final hasAuth = headers.entries.any(
         (e) =>
-            e.key.toLowerCase() == 'authorization' && e.value == 'Bearer tok-abc',
+            e.key.toLowerCase() == 'authorization' &&
+            e.value == 'Bearer tok-abc',
       );
       expect(hasAuth, isTrue);
     });
@@ -72,9 +75,9 @@ void main() {
 
       await client.get('/api/v1/projects');
 
-      final headers = adapter.captured.single.headers ?? {};
-      final hasAuth = headers.keys
-          .any((k) => k.toLowerCase() == 'authorization');
+      final headers = adapter.captured.single.headers;
+      final hasAuth =
+          headers.keys.any((k) => k.toLowerCase() == 'authorization');
       expect(hasAuth, isFalse);
     });
 

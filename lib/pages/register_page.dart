@@ -14,7 +14,7 @@ class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 
   @override
-  State<RegisterPage> createState() => _RegisterPageState();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
@@ -143,7 +143,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (error is ApiException) {
       return error.message;
     }
-    return error != null ? 'Ошибка регистрации. Проверьте данные и сеть.' : null;
+    return error != null
+        ? 'Ошибка регистрации. Проверьте данные и сеть.'
+        : null;
   }
 
   @override

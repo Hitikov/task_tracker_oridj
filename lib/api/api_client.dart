@@ -17,18 +17,18 @@ import 'api_error.dart';
 ///   ни тела ответов.
 class ApiClient {
   ApiClient({Dio? dio, this.getToken, String? baseUrl})
-    : _dio = dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: baseUrl ??
-                  String.fromEnvironment('API_BASE_URL',
-                      defaultValue: 'http://localhost:8080'),
-              connectTimeout: const Duration(seconds: 10),
-              sendTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 10),
-              receiveDataWhenStatusError: true,
-            ),
-          ) {
+      : _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: baseUrl ??
+                    String.fromEnvironment('API_BASE_URL',
+                        defaultValue: 'http://localhost:8080'),
+                connectTimeout: const Duration(seconds: 10),
+                sendTimeout: const Duration(seconds: 10),
+                receiveTimeout: const Duration(seconds: 10),
+                receiveDataWhenStatusError: true,
+              ),
+            ) {
     _dio.interceptors.add(_BearerInterceptor(getToken));
     _dio.interceptors.add(_SanitizedLogger());
   }
@@ -51,8 +51,14 @@ class ApiClient {
   /// Возвращает массив объектов по схеме `Project[]` и других массивов.
   Future<List<Map<String, dynamic>>> getList(String path) async {
     try {
-      final response = await _dio.get<List<Map<String, dynamic>>>(path);
-      return response.data ?? const <Map<String, dynamic>>[];
+      // Тип generic — `List<dynamic>`: JSON-массив десериализуется в список
+      // `dynamic`, поэтому явно приводим элементы к картам.
+      final response = await _dio.get<List<dynamic>>(path);
+      final data = response.data;
+      if (data == null) {
+        return const <Map<String, dynamic>>[];
+      }
+      return [for (final entry in data) entry as Map<String, dynamic>];
     } on DioException catch (e) {
       throw e.asApiException();
     }
@@ -112,13 +118,20 @@ class _BearerInterceptor implements Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final headers = (options.headers ??= <String, dynamic>{});
     final token = await _getToken?.call();
     if (token != null && token.isNotEmpty) {
-      headers[io.HttpHeaders.authorizationHeader] = 'Bearer $token';
+      options.headers[io.HttpHeaders.authorizationHeader] = 'Bearer $token';
     }
     handler.next(options);
   }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) =>
+      handler.next(response);
+
+  @override
+  void onError(DioException error, ErrorInterceptorHandler handler) =>
+      handler.next(error);
 }
 
 /// Логгер без чувствительных данных.

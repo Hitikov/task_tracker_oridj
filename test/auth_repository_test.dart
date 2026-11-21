@@ -76,8 +76,10 @@ void main() {
 
     test('currentUser возвращает пользователя по токену', () async {
       tokens.storedToken = 'token-ada@example.com';
+      final api = FakeApiClient(token: 'token-ada@example.com');
+      final repositoryWithToken = AuthRepository(api: api, tokens: tokens);
 
-      final me = await repository.currentUser();
+      final me = await repositoryWithToken.currentUser();
 
       expect(me, isNotNull);
       expect(me!.email, 'ada@example.com');

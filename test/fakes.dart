@@ -1,11 +1,9 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:task_tracker_oridj/api/api_client.dart';
 import 'package:task_tracker_oridj/api/api_error.dart';
-import 'package:task_tracker_oridj/auth/auth_repository.dart';
 import 'package:task_tracker_oridj/auth/token_store.dart';
 import 'package:task_tracker_oridj/models/project.dart';
 import 'package:task_tracker_oridj/models/project_create.dart';
@@ -14,24 +12,14 @@ import 'package:task_tracker_oridj/state/auth_providers.dart';
 import 'package:task_tracker_oridj/state/projects_providers.dart';
 
 /// Статический пользователь для тестовых ответов API.
-User fakeUser(String email) {
+User fakeUser(String email, {String name = ''}) {
   return User(
     id: 'user-1',
     email: email,
-    name: email,
-    createdAt: DateTime(2026, 11, 15, 12),
-    updatedAt: DateTime(2026, 11, 15, 12),
+    name: name.isEmpty ? email : name,
+    createdAt: DateTime.utc(2026, 11, 15, 12),
+    updatedAt: DateTime.utc(2026, 11, 15, 12),
   );
-}
-
-/// Тело ответа `AuthResponse` для фиктивного email.
-Map<String, dynamic> authResponseJson(String email) {
-  return {
-    'token': 'token-$email',
-    'tokenType': 'Bearer',
-    'expiresIn': 86400,
-    'user': fakeUser(email).toJson(),
-  };
 }
 
 /// Фиктивный проект для тестов.
@@ -85,7 +73,8 @@ class FakeTokenStore implements TokenStore {
 /// Подменённый [ApiClient] без сети.
 ///
 /// - `post` на `/api/v1/auth/login`, `/api/v1/auth/register` — возвращает
-///   [authResponseJson].
+///   карту ответа `AuthResponse`.
+/// - `post` на `/api/v1/projects` — возвращает фейковый проект.
 /// - `get` на `/api/v1/auth/me` — возвращает пользователя из текущего токена
 ///   (или `unauthorized`).
 /// - `getList` на `/api/v1/projects` — [projectsList].
@@ -95,13 +84,16 @@ class FakeApiClient extends ApiClient {
   FakeApiClient({
     this.projectsList = const <Map<String, dynamic>>[],
     this.throwOnPost = false,
-  });
+    String? token,
+  }) : _token = token;
 
   final List<Map<String, dynamic>> projectsList;
   final bool throwOnPost;
   final List<({String path, Map<String, dynamic>? body})> calls = [];
 
   static const String _tokenPrefix = 'token-';
+
+  String? _token;
 
   @override
   Future<Map<String, dynamic>> post(
@@ -119,7 +111,26 @@ class FakeApiClient extends ApiClient {
     switch (path) {
       case '/api/v1/auth/login':
       case '/api/v1/auth/register':
-        return authResponseJson((body?['email'] as String?) ?? '');
+        final email = (body?['email'] as String?) ?? '';
+        final name = (body?['name'] as String?) ?? email;
+        final response = <String, dynamic>{
+          'token': 'token-$email',
+          'tokenType': 'Bearer',
+          'expiresIn': 86400,
+          'user': fakeUser(email, name: name).toJson(),
+        };
+        _token = response['token'] as String;
+        return response;
+      case '/api/v1/projects':
+        return Project(
+          id: 'project-${(body?['key'] as String?) ?? ''}',
+          key: (body?['key'] as String?) ?? '',
+          name: (body?['name'] as String?) ?? '',
+          description: body?['description'] as String?,
+          ownerId: 'user-1',
+          createdAt: DateTime.utc(2026, 11, 15, 12),
+          updatedAt: DateTime.utc(2026, 11, 15, 12),
+        ).toJson();
       default:
         throw ApiException(
           code: 'not_found',
@@ -133,7 +144,7 @@ class FakeApiClient extends ApiClient {
   Future<Map<String, dynamic>> get(String path) async {
     calls.add((path: path, body: null));
     if (path == '/api/v1/auth/me') {
-      final token = await getToken?.call();
+      final token = _token;
       if (token == null || !token.startsWith(_tokenPrefix)) {
         throw ApiException(
           code: 'unauthorized',
@@ -158,7 +169,7 @@ class FakeApiClient extends ApiClient {
 }
 
 /// Подменённый [AuthSession] без сети.
-class FakeAuthSession extends AsyncNotifier<User?> {
+class FakeAuthSession extends AuthSession {
   FakeAuthSession({
     this.loginResponder,
     this.registerResponder,
@@ -208,9 +219,14 @@ class FakeAuthSession extends AsyncNotifier<User?> {
     required String name,
   }) async {
     state = AsyncValue.loading();
-    final user =
-        registerResponder?.call(email, name, password) ?? fakeUser(email);
-    state = AsyncValue.data(user);
+    User? user;
+    if (registerResponder != null) {
+      user = await registerResponder!(email, name, password);
+    } else {
+      user = fakeUser(email);
+    }
+    // После регистрации пользователь остаётся на экране входа: сюда он
+    // попадёт из диалога «Вы зарегистрированы» (см. RegisterPage).
     return user;
   }
 
