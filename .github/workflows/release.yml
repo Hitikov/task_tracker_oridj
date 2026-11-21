@@ -322,7 +322,7 @@ jobs:
           $version = "${{ needs.lint.outputs.version }}"
           $root = (Get-Location).Path
           & $iscc "installer\windows\arij.iss" `
-            "/DAppVersion=$version" `
+            "/DMyAppVersion=$version" `
             "/DSourceDir=$root\build\windows\x64\runner\Release" `
             "/DOutputDir=$root\dist"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
@@ -365,7 +365,7 @@ jobs:
         run: |
           cd dist
           rm -f SHA256SUMS.txt
-          sha256sum *.apk *.aab *.zip > SHA256SUMS.txt
+          sha256sum *.apk *.aab *.zip *.exe > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Create GitHub Release
@@ -392,14 +392,17 @@ jobs:
 
             ### Windows
 
-            1. Скачайте `task_tracker_oridj-${{ needs.lint.outputs.version }}-windows-x64.zip` и распакуйте в любую папку.
-            2. Запустите `task_tracker_oridj.exe`.
+            1. Скачайте `ArijSetup-${{ needs.lint.outputs.version }}-x64.exe` и запустите его.
+            2. Установщик распакует приложение в `%LOCALAPPDATA%\Arij` и создаст ярлык на рабочем столе.
+            3. `task_tracker_oridj-${{ needs.lint.outputs.version }}-windows-x64.zip` — портативная версия без установки.
 
             > Сборка не подписана. Windows SmartScreen может показать предупреждение — выберите «Подробнее» → «Выполнить в любом случае».
 
-            ### Демо-вход
+            ### Вход
 
-            Логин `12345`, пароль `12345`. Остальные данные отклоняются.
+            Приложения подключены к `http://144.31.170.81`. Зарегистрируйте аккаунт
+            и войдите. Старый демо-вход `12345/12345` доступен только при сборке
+            с `--dart-define=DEMO_MODE=true`.
 
             ### Проверка целостности
 
@@ -415,5 +418,6 @@ jobs:
             dist/*.apk
             dist/*.aab
             dist/*.zip
+            dist/*.exe
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
