@@ -44,7 +44,8 @@ info:
     (epic/task/subtask — уровень иерархии) и `typeId` (bug/feature/custom —
     классификация) это разные измерения задачи и не смешиваются.
     Задача получает порядковый `number` в проекте; `key` вычисляется как
-    `<key проекта>-<number>`, например `ARIJ-1`. Kanban появится на этапе 3.
+    `<key проекта>-<number>`, например `ARIJ-1`. Kanban (этап 3) добавляет
+    `PATCH /tasks/{id}/status` и `GET /projects/{id}/board`.
 
     ## Документы
 
@@ -72,6 +73,8 @@ tags:
     description: "Задачи Backlog: создание, просмотр, изменение, удаление"
   - name: Metadata
     description: Типы задач и статусы проекта
+  - name: Board
+    description: "Канбан (этап 3): смена статуса и данные доски по колонкам"
 
 security:
   - bearerAuth: []
@@ -930,6 +933,68 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/tasks/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    patch:
+      tags: [Board]
+      summary: Сменить статус задачи
+      description: |
+        Изменяет только `statusId` задачи и возвращает обновлённую задачу.
+        Статус обязан принадлежать проекту задачи: статус чужого проекта
+        возвращает `400 validation_error` с `details.field: statusId`.
+        Доступно владельцу и участникам проекта. Повторная установка
+        текущего статуса допустима.
+      operationId: changeTaskStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskStatusUpdate'
+            examples:
+              move:
+                summary: Перевод задачи в «In Progress»
+                value:
+                  statusId: 66666666-7777-4888-9999-000000000005
+      responses:
+        '200':
+          description: Задача с новым статусом
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              examples:
+                changed:
+                  summary: Обновлённая задача
+                  value:
+                    id: 11111111-2222-4333-8444-555555555556
+                    projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                    number: 2
+                    key: ARIJ-2
+                    kind: task
+                    typeId: 66666666-7777-4888-9999-000000000001
+                    statusId: 66666666-7777-4888-9999-000000000005
+                    title: CRUD задач на сервере
+                    description: Миграции, маршруты и валидация
+                    priority: high
+                    assigneeId: null
+                    reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    parentId: null
+                    dueDate: null
+                    createdAt: '2026-11-29T10:05:00.000Z'
+                    updatedAt: '2026-12-06T12:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/v1/projects/{id}/task-types:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -1018,6 +1083,88 @@ paths:
                       position: 2
                       isDefault: false
                       createdAt: '2026-11-29T09:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{id}/board:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Board]
+      summary: Данные Канбан-доски проекта
+      description: |
+        Возвращает колонки доски в порядке `position` статусов проекта.
+        В каждой колонке — задачи с этим статусом, отсортированные по
+        `number`; пустые колонки тоже возвращаются. Необязательные фильтры
+        `assignee` и `priority` применяются к задачам до группировки.
+        Доступно владельцу и участникам проекта.
+      operationId: getProjectBoard
+      parameters:
+        - name: assignee
+          in: query
+          required: false
+          description: UUID исполнителя
+          schema:
+            type: string
+            format: uuid
+        - name: priority
+          in: query
+          required: false
+          description: Приоритет задачи
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+      responses:
+        '200':
+          description: Колонки доски
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BoardColumn'
+              examples:
+                board:
+                  summary: Две колонки с задачами
+                  value:
+                    - status:
+                        id: 66666666-7777-4888-9999-000000000002
+                        projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                        name: To Do
+                        key: todo
+                        position: 0
+                        isDefault: true
+                      tasks:
+                        - id: 11111111-2222-4333-8444-555555555555
+                          projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                          number: 1
+                          key: ARIJ-1
+                          kind: epic
+                          typeId: 66666666-7777-4888-9999-000000000001
+                          statusId: 66666666-7777-4888-9999-000000000002
+                          title: Ядро MVP
+                          description: null
+                          priority: high
+                          assigneeId: null
+                          reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                          parentId: null
+                          dueDate: null
+                          createdAt: '2026-11-29T10:00:00.000Z'
+                          updatedAt: '2026-11-29T10:00:00.000Z'
+                    - status:
+                        id: 66666666-7777-4888-9999-000000000005
+                        projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                        name: In Progress
+                        key: in_progress
+                        position: 1
+                        isDefault: false
+                      tasks: []
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1644,7 +1791,7 @@ components:
     Status:
       type: object
       additionalProperties: false
-      required: [id, projectId, name, position, isDefault, createdAt]
+      required: [id, projectId, name, key, position, isDefault]
       description: Статус задачи проекта; задаёт колонку Backlog/Kanban.
       properties:
         id:
@@ -1662,6 +1809,13 @@ components:
           description: Название статуса, уникально в пределах проекта
           examples:
             - To Do
+        key:
+          type: string
+          description: |
+            Код статуса, вычисляемый сервером из названия (`todo`,
+            `in_progress`, `done`). В БД отдельной колонки нет.
+          examples:
+            - todo
         position:
           type: integer
           minimum: 0
@@ -1675,3 +1829,30 @@ components:
           type: string
           format: date-time
           readOnly: true
+
+    TaskStatusUpdate:
+      type: object
+      additionalProperties: false
+      required: [statusId]
+      description: Тело запроса смены статуса задачи (этап 3).
+      properties:
+        statusId:
+          type: string
+          format: uuid
+          description: Статус должен принадлежать проекту задачи
+      examples:
+        - statusId: 66666666-7777-4888-9999-000000000005
+
+    BoardColumn:
+      type: object
+      additionalProperties: false
+      required: [status, tasks]
+      description: Одна колонка Канбан-доски — статус и задачи в нём.
+      properties:
+        status:
+          $ref: '#/components/schemas/Status'
+        tasks:
+          type: array
+          description: Задачи колонки, отсортированные по `number`
+          items:
+            $ref: '#/components/schemas/Task'
