@@ -32,6 +32,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _submitting = false;
 
   /// Простая проверка формата email: что-то@что-то.домен
   static final RegExp _emailRegExp = RegExp(
@@ -47,13 +48,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     super.dispose();
   }
 
-  String? _validateLogin(String? value) {
-    final login = value?.trim() ?? '';
-    if (login.isEmpty) {
-      return 'Введите логин';
+  String? _validateName(String? value) {
+    final name = value?.trim() ?? '';
+    if (name.isEmpty) {
+      return 'Введите имя';
     }
-    if (login.length < 3) {
-      return 'Минимум 3 символа';
+    if (name.length > 100) {
+      return 'Максимум 100 символов';
     }
     return null;
   }
@@ -77,6 +78,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (password.length < 8) {
       return 'Минимум 8 символов';
     }
+    if (password.length > 128) {
+      return 'Максимум 128 символов';
+    }
     return null;
   }
 
@@ -90,21 +94,25 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     return null;
   }
 
-  void _onSubmit() {
-    // После отправки все поля считаются «тронутыми».
+  Future<void> _onSubmit() async {
     _confirmTouched = true;
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    ref
-        .read(authSessionProvider.notifier)
-        .register(
-          email: _emailController.text.trim(),
-          name: _loginController.text.trim(),
-          password: _passwordController.text,
-        )
-        .then((_) => _showSuccessDialog(), onError: (_) {});
+    setState(() => _submitting = true);
+    try {
+      await ref.read(authSessionProvider.notifier).register(
+            email: _emailController.text.trim(),
+            name: _loginController.text.trim(),
+            password: _passwordController.text,
+          );
+      if (mounted) setState(() => _submitting = false);
+      await _showSuccessDialog();
+    } catch (_) {
+      // Ошибка отображается из состояния сессии.
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   Future<void> _showSuccessDialog() {
@@ -151,6 +159,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLoading = _submitting;
     final errorText = _sessionErrorText();
 
     return Scaffold(
@@ -175,15 +184,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   TextFormField(
                     controller: _loginController,
                     textInputAction: TextInputAction.next,
-                    validator: _validateLogin,
+                    validator: _validateName,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     decoration: const InputDecoration(
-                      labelText: 'Логин',
+                      labelText: 'Имя',
                       border: OutlineInputBorder(),
-                      // Пустая подсказка резервирует строку под ошибку,
-                      // чтобы поля не «прыгали».
                       helperText: ' ',
-                      errorMaxLines: 1,
+                      errorMaxLines: 2,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -274,9 +281,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       ),
                     ),
                   const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: _onSubmit,
-                    child: const Text('Зарегистрироваться'),
+                  FilledButton.icon(
+                    onPressed: isLoading ? null : _onSubmit,
+                    icon: isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.person_add_outlined),
+                    label: Text(
+                      isLoading ? 'Регистрация…' : 'Зарегистрироваться',
+                    ),
                   ),
                 ],
               ),
