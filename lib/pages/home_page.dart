@@ -37,6 +37,26 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   HomeSection _selectedSection = HomeSection.dashboard;
 
+  /// Ширина бокового меню на широких экранах; меняется перетаскиванием.
+  double _sidebarWidth = 280;
+  static const double _minSidebarWidth = 200;
+  static const double _maxSidebarWidth = 440;
+
+  void _resizeSidebar(double delta) {
+    final next = _sidebarWidth + delta;
+    if (next < _minSidebarWidth) {
+      if (_sidebarWidth != _minSidebarWidth) {
+        setState(() => _sidebarWidth = _minSidebarWidth);
+      }
+    } else if (next > _maxSidebarWidth) {
+      if (_sidebarWidth != _maxSidebarWidth) {
+        setState(() => _sidebarWidth = _maxSidebarWidth);
+      }
+    } else if (next != _sidebarWidth) {
+      setState(() => _sidebarWidth = next);
+    }
+  }
+
   void _selectSection(HomeSection section) {
     setState(() => _selectedSection = section);
   }
@@ -88,6 +108,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
             ),
+          if (isWideScreen)
+            IconButton(
+              onPressed: () => setState(() => _sidebarWidth = 280),
+              tooltip: 'Сбросить ширину меню',
+              icon: const Icon(Icons.view_sidebar_outlined),
+            ),
           IconButton(
             onPressed: _checkForUpdate,
             tooltip: 'Проверить обновления',
@@ -117,7 +143,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         children: [
           if (isWideScreen) ...[
             SizedBox(
-              width: 280,
+              key: const Key('sidebar-panel'),
+              width: _sidebarWidth,
               child: AppSidebar(
                 login: widget.login,
                 selectedSection: _selectedSection,
@@ -125,7 +152,24 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onLogout: _logout,
               ),
             ),
-            const VerticalDivider(width: 1),
+            MouseRegion(
+              cursor: SystemMouseCursors.resizeLeftRight,
+              child: GestureDetector(
+                key: const Key('sidebar-resize-handle'),
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragUpdate: (details) =>
+                    _resizeSidebar(details.delta.dx),
+                onDoubleTap: () => setState(() => _sidebarWidth = 280),
+                child: SizedBox(
+                  width: 10,
+                  child: VerticalDivider(
+                    width: 10,
+                    thickness: 2,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+            ),
           ],
           Expanded(child: _buildContent()),
         ],
