@@ -304,6 +304,26 @@ class FakeApiClient extends ApiClient {
     if (path == '/api/v1/projects') return projectsList;
     final tasksPath = RegExp(r'^/api/v1/projects/([^/]+)/tasks(?:\?.*)?$');
     if (tasksPath.hasMatch(path)) return tasks;
+    final boardPath = RegExp(r'^/api/v1/projects/([^/]+)/board$');
+    final boardMatch = boardPath.firstMatch(path);
+    if (boardMatch != null) {
+      final projectId = boardMatch.group(1)!;
+      final projectStatuses = statuses
+          .where((s) => (s['projectId'] as String?) == projectId)
+          .toList();
+      final projectTasks =
+          tasks.where((t) => (t['projectId'] as String?) == projectId).toList();
+      return <Map<String, dynamic>>[
+        for (final status in projectStatuses)
+          <String, dynamic>{
+            'status': status,
+            'tasks': [
+              for (final task in projectTasks)
+                if (task['statusId'] == status['id']) task,
+            ],
+          },
+      ];
+    }
     final typesPath = RegExp(r'^/api/v1/projects/([^/]+)/task-types$');
     if (typesPath.hasMatch(path)) return taskTypes;
     final statusesPath = RegExp(r'^/api/v1/projects/([^/]+)/statuses$');
@@ -327,19 +347,36 @@ class FakeApiClient extends ApiClient {
         details: null,
       );
     }
-    final taskPatch = RegExp(r'^/api/v1/tasks/([^/]+)$');
-    final match = taskPatch.firstMatch(path);
-    if (match != null) {
-      final id = match.group(1)!;
-      final existing = tasks.where((t) => t['id'] == id).firstOrNull;
-      if (existing == null) {
+    final statusPatch = RegExp(r'^/api/v1/tasks/([^/]+)/status$');
+    final statusMatch = statusPatch.firstMatch(path);
+    if (statusMatch != null) {
+      final id = statusMatch.group(1)!;
+      final index = tasks.indexWhere((t) => t['id'] == id);
+      if (index == -1) {
         throw ApiException(
           code: 'not_found',
           message: 'Не найдено',
           details: null,
         );
       }
-      final merged = <String, dynamic>{...existing, ...?body};
+      final merged = <String, dynamic>{...tasks[index], ...?body};
+      tasks[index] = merged;
+      return merged;
+    }
+    final taskPatch = RegExp(r'^/api/v1/tasks/([^/]+)$');
+    final match = taskPatch.firstMatch(path);
+    if (match != null) {
+      final id = match.group(1)!;
+      final index = tasks.indexWhere((t) => t['id'] == id);
+      if (index == -1) {
+        throw ApiException(
+          code: 'not_found',
+          message: 'Не найдено',
+          details: null,
+        );
+      }
+      final merged = <String, dynamic>{...tasks[index], ...?body};
+      tasks[index] = merged;
       return merged;
     }
     throw ApiException(
