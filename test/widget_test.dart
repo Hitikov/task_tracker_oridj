@@ -1,10 +1,15 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'package:task_tracker_oridj/api/person_controller.dart';
 import 'package:task_tracker_oridj/app/arij_app.dart';
 import 'package:task_tracker_oridj/database/app_database.dart';
 import 'package:task_tracker_oridj/repositories/person_repository.dart';
+import 'package:task_tracker_oridj/state/auth_providers.dart';
+
+import 'fakes.dart';
 
 void main() {
   late AppDatabase db;
@@ -19,6 +24,17 @@ void main() {
     await db.close();
   });
 
+  Future<void> pumpApp(WidgetTester tester, {FakeAuthSession? session}) {
+    return tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authSessionProvider.overrideWith(() => session ?? FakeAuthSession()),
+        ],
+        child: ArijApp(personController: personController),
+      ),
+    );
+  }
+
   Future<void> login(WidgetTester tester) async {
     await tester.enterText(find.byType(TextField).at(0), '12345');
     await tester.enterText(find.byType(TextField).at(1), '12345');
@@ -27,7 +43,7 @@ void main() {
   }
 
   testWidgets('приложение стартует с экрана входа', (tester) async {
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(tester);
 
     expect(find.text('Arij'), findsOneWidget);
     expect(find.text('Вход в Arij'), findsOneWidget);
@@ -35,7 +51,7 @@ void main() {
   });
 
   testWidgets('пустая форма входа показывает ошибку', (tester) async {
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(tester);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Войти'));
     await tester.pumpAndSettle();
@@ -44,19 +60,25 @@ void main() {
   });
 
   testWidgets('неверные данные не пускают в приложение', (tester) async {
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(
+      tester,
+      session: FakeAuthSession(
+        loginResponder: (email, password) async =>
+            password == 'secret' ? null : fakeUser(email),
+      ),
+    );
 
     await tester.enterText(find.byType(TextField).at(0), 'demo_user');
     await tester.enterText(find.byType(TextField).at(1), 'secret');
     await tester.tap(find.widgetWithText(FilledButton, 'Войти'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Неверный логин или пароль'), findsOneWidget);
+    expect(find.text('Неверный email или пароль'), findsOneWidget);
     expect(find.text('Вход в Arij'), findsOneWidget);
   });
 
   testWidgets('вход открывает основную оболочку', (tester) async {
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(tester);
 
     await login(tester);
 
@@ -70,7 +92,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(tester);
     await login(tester);
 
     expect(find.byIcon(Icons.menu), findsNothing);
@@ -85,14 +107,14 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(tester);
     await login(tester);
 
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('из меню открывается раздел планов', (tester) async {
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(tester);
     await login(tester);
 
     await tester.tap(find.byIcon(Icons.menu));
@@ -104,7 +126,7 @@ void main() {
   });
 
   testWidgets('из меню открывается демо работы с БД', (tester) async {
-    await tester.pumpWidget(ArijApp(personController: personController));
+    await pumpApp(tester);
     await login(tester);
 
     await tester.tap(find.byIcon(Icons.menu));
@@ -115,13 +137,15 @@ void main() {
     expect(find.text('Демо работы с БД'), findsOneWidget);
     expect(
       find.widgetWithText(
-          ElevatedButton, 'Запустить CRUD-демо (Проверка связи с БД)'),
+        ElevatedButton,
+        'Запустить CRUD-демо (Проверка связи с БД)',
+      ),
       findsOneWidget,
     );
   });
 
-  testWidgets('регистрация возвращает логин на экран входа', (tester) async {
-    await tester.pumpWidget(ArijApp(personController: personController));
+  testWidgets('регистрация возвращает email на экран входа', (tester) async {
+    await pumpApp(tester);
 
     await tester.tap(find.widgetWithText(TextButton, 'Зарегистрироваться'));
     await tester.pumpAndSettle();
@@ -145,6 +169,8 @@ void main() {
 
     expect(find.text('Вход в Arij'), findsOneWidget);
     final loginField = tester.widget<TextField>(find.byType(TextField).first);
-    expect(loginField.controller?.text, 'new_user');
+    // Осознанное обновление: после регистрации возвращаем email — логин
+    // заполняется им.
+    expect(loginField.controller?.text, 'new@example.com');
   });
 }

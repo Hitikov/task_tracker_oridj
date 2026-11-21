@@ -1,29 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/person_controller.dart';
+import '../state/auth_providers.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/roadmap_view.dart';
 import '../widgets/section_placeholder.dart';
 import 'db_demo_page.dart';
 import 'home_section.dart';
 import 'login_page.dart';
+import 'projects_page.dart';
 
 /// Основная оболочка приложения: боковое меню и область контента.
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({
     super.key,
     required this.login,
-    required this.personController,
+    this.personController,
+    this.demoMode = false,
   });
 
   final String login;
-  final PersonController personController;
+
+  /// Для открытия демо-страницы работы с БД (legacy Drift).
+  final PersonController? personController;
+
+  /// Демо-режим: локальный вход `12345/12345` без сервера.
+  final bool demoMode;
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends ConsumerState<HomePage> {
   HomeSection _selectedSection = HomeSection.dashboard;
 
   void _selectSection(HomeSection section) {
@@ -33,15 +42,21 @@ class _HomePageState extends State<HomePage> {
   void _openDbDemo() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => DbDemoPage(personController: widget.personController),
+        builder: (_) => DbDemoPage(
+          personController: widget.personController,
+        ),
       ),
     );
   }
 
   void _logout() {
+    ref.read(authSessionProvider.notifier).logout();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => LoginPage(personController: widget.personController),
+        builder: (_) => LoginPage(
+          demoMode: widget.demoMode,
+          personController: widget.personController,
+        ),
       ),
     );
   }
@@ -134,12 +149,7 @@ class _HomePageState extends State<HomePage> {
           description: 'Форма создания задачи появится на следующем этапе. '
               'Сейчас в проекте собран только интерфейс приложения.',
         ),
-      HomeSection.projects => const SectionPlaceholder(
-          icon: Icons.folder_outlined,
-          title: 'Проекты',
-          description: 'Список проектов, участников команды и задач появится '
-              'после подключения серверной части.',
-        ),
+      HomeSection.projects => const ProjectsPage(),
       HomeSection.roadmap => const RoadmapView(),
     };
   }

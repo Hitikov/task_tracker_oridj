@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Экран регистрации.
+import '../api/api_error.dart';
+import '../state/auth_providers.dart';
+
+/// Экран регистрации: реальный вызов `POST /api/v1/auth/register`
+/// через [AuthSession].
 ///
-/// Пока без бэкенда — только вёрстка и валидация полей. После успешного
-/// заполнения формы логин возвращается на экран входа.
-class RegisterPage extends StatefulWidget {
+/// После валидации формы регистрация вызывается сразу; по успеху показывается
+/// диалог «Вы зарегистрированы» — его кнопка «Перейти ко входу» возвращает
+/// email на экран входа.
+class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 
   @override
-  State<RegisterPage> createState() => _RegisterPageState();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
 
   /// Нужен, чтобы перепроверить «повторите пароль» при правке основного пароля.
@@ -90,43 +96,38 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    // TODO(backend): подключить реальную регистрацию.
-    _showSuccessDialog();
+
+    ref
+        .read(authSessionProvider.notifier)
+        .register(
+          email: _emailController.text.trim(),
+          name: _loginController.text.trim(),
+          password: _passwordController.text,
+        )
+        .then((_) => _showSuccessDialog(), onError: (_) {});
   }
 
   Future<void> _showSuccessDialog() {
+    if (!mounted) return Future.value();
+
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-
         return AlertDialog(
           icon: const Icon(Icons.check_circle_outline, size: 48),
           title: const Text('Вы зарегистрированы'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Аккаунт «${_loginController.text.trim()}» успешно создан.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Демо-режим: данные пока не отправляются на сервер.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+          content: Text(
+            'Аккаунт «${_emailController.text.trim()}» успешно создан.',
+            textAlign: TextAlign.center,
           ),
           actions: [
             FilledButton(
               onPressed: () {
-                final login = _loginController.text.trim();
                 Navigator.of(dialogContext).pop(); // закрыть диалог
-                Navigator.of(context).pop(login); // вернуться на экран входа
+                Navigator.of(context).pop(
+                  _emailController.text.trim(), // вернуться на экран входа
+                );
               },
               child: const Text('Перейти ко входу'),
             ),
@@ -136,9 +137,21 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  /// Сообщение об ошибке сессии — показывается под формой.
+  String? _sessionErrorText() {
+    final error = ref.watch(authSessionProvider).error;
+    if (error is ApiException) {
+      return error.message;
+    }
+    return error != null
+        ? 'Ошибка регистрации. Проверьте данные и сеть.'
+        : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final errorText = _sessionErrorText();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Регистрация')),
@@ -252,6 +265,14 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                   ),
+                  if (errorText != null)
+                    Text(
+                      errorText,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _onSubmit,
