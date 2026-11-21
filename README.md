@@ -1,10 +1,11 @@
 # Arij — трекер задач для командной работы
 
-> **Статус:** фундамент готов (этап 0): ADR, OpenAPI, каркас сервера `server/`,
-> Docker Compose с PostgreSQL и backend CI. Идёт этап 1 — реальная авторизация,
-> проекты и данные в PostgreSQL. Пока приложение запускается в демо-режиме:
-> вход `12345/12345`, данные хранятся локально на клиенте.
-> Актуальный план — в [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Статус:** этапы 0–1 завершены. Сервер умеет регистрировать и авторизовать
+> пользователей, управлять проектами и участниками; данные хранятся в PostgreSQL.
+> Клиент использует REST API (`dio` + JWT) и хранит токен в secure storage;
+> демо-вход `12345/12345` доступен с `DEMO_MODE=true`. Отчёт — в
+> [docs/reports/stage-1.md](docs/reports/stage-1.md), план — в
+> [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Описание проекта
 
@@ -122,11 +123,12 @@ Copy-Item .env.example .env   # затем задайте JWT_SECRET
 ./scripts/dev-up.ps1           # docker compose up -d --build + ожидание /health
 ```
 
-Сервер отвечает на <http://localhost:8080/health>. Подробности — в
-[docs/local-dev.md](docs/local-dev.md). Миграции и схема БД появятся на этапе 1.
+Сервер отвечает на <http://localhost:8080/health>, при старте применяет миграции.
+Подробности — в [docs/local-dev.md](docs/local-dev.md).
 
-> Backend пока не подключён к клиенту: приложение запускается в демо-режиме и
-> хранит данные локально. Следите за [docs/ROADMAP.md](docs/ROADMAP.md).
+> Клиент по умолчанию обращается к `http://localhost:8080`. Переопределить адрес
+> можно через `--dart-define=API_BASE_URL=...`; демо-режим — `--dart-define=DEMO_MODE=true`.
+> Следите за [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Структура репозитория
 

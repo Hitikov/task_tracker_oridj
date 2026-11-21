@@ -4,7 +4,7 @@
 - **Ветка:** `feature/stage-1-auth-projects`
 - **PR:** [#21](https://github.com/Hitikov/task_tracker_oridj/pull/21) (draft)
 - **План:** [ROADMAP](../ROADMAP.md)
-- **Статус:** готов, готовится к мержу в `main`
+- **Статус:** завершён, влит в `main` (`5606cfc`, PR #21)
 
 ## Цель этапа
 
