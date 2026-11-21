@@ -310,3 +310,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 2 | влиты миграции, серверный API и клиентский Backlog; e2e Epic→Task→Subtask пройден; отчёт `docs/reports/stage-2.md` | `847c473` |
 | 21.11.2026 | 2 | этап 2 влит в `main` после зелёного CI, PR #23 | `a213ef2` |
 | 21.11.2026 | 3 | создана ветка `feature/stage-3-kanban`, начата работа над доской | `feature/stage-3-kanban` |
+| 21.11.2026 | 3 | влиты API доски и клиентский Kanban; e2e To Do → Done и сохранение после рестарта; отчёт `docs/reports/stage-3.md` | `b84426e` |
