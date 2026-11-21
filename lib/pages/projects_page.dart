@@ -11,43 +11,93 @@ import 'kanban_page.dart';
 
 /// Экран проектов: список + создание нового проекта
 /// (`POST /api/v1/projects`, схема `ProjectCreate`).
-class ProjectsPage extends ConsumerWidget {
+class ProjectsPage extends ConsumerStatefulWidget {
   const ProjectsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+  ConsumerState<ProjectsPage> createState() => _ProjectsPageState();
+}
+
+class _ProjectsPageState extends ConsumerState<ProjectsPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(authSessionProvider);
 
     if (session.hasError) {
-      return Center(
-        child: Text(
-          'Сессия потеряна. Выйдите и войдите снова.',
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.error),
-        ),
-      );
+      return _SessionErrorState(message: _sessionErrorText(session.error));
     }
 
     final projects = ref.watch(projectsProvider);
 
-    if (projects.hasError) {
-      return _ErrorCard(message: _errorTextOf(projects.error));
+    if (projects.isLoading && projects.value == null) {
+      return const _ProjectsLoading();
     }
 
-    final list = projects.value ?? const <Project>[];
+    if (projects.hasError && projects.value == null) {
+      return _ErrorCard(
+        message: _errorTextOf(projects.error),
+        onRetry: () => ref.read(projectsProvider.notifier).refresh(),
+      );
+    }
+
+    final allProjects = projects.value ?? const <Project>[];
+    final query = _searchController.text.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? allProjects
+        : allProjects
+            .where(
+              (p) =>
+                  p.name.toLowerCase().contains(query) ||
+                  p.key.toLowerCase().contains(query),
+            )
+            .toList();
 
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            controller: _searchController,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Поиск по названию или ключу',
+              prefixIcon: const Icon(Icons.search),
+              isDense: true,
+              border: const OutlineInputBorder(),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Очистить поиск',
+                      onPressed: () => setState(_searchController.clear),
+                      icon: const Icon(Icons.clear),
+                    ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
         Expanded(
-          child: list.isEmpty
-              ? const _EmptyState()
+          child: filtered.isEmpty
+              ? _EmptyState(
+                  hasProjects: allProjects.isNotEmpty,
+                  onClearSearch: query.isEmpty
+                      ? null
+                      : () => setState(_searchController.clear),
+                  onCreate: () => _showCreateDialog(context),
+                )
               : ListView.builder(
-                  itemCount: list.length,
+                  itemCount: filtered.length,
                   itemBuilder: (context, index) => _ProjectTile(
-                    project: list[index],
-                    onTap: () => _openProject(context, list[index]),
-                    onKanban: () => _openKanban(context, list[index]),
+                    project: filtered[index],
+                    onTap: () => _openProject(context, filtered[index]),
+                    onKanban: () => _openKanban(context, filtered[index]),
                   ),
                 ),
         ),
@@ -87,6 +137,11 @@ class ProjectsPage extends ConsumerWidget {
       ),
     );
   }
+
+  String _sessionErrorText(Object? error) {
+    if (error is ApiException) return error.message;
+    return 'Сессия потеряна. Выйдите и войдите снова.';
+  }
 }
 
 class _ProjectTile extends StatelessWidget {
@@ -124,31 +179,23 @@ class _ProjectTile extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _ProjectsLoading extends StatelessWidget {
+  const _ProjectsLoading();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(
-            Icons.folder_outlined,
-            size: 48,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 8),
-          Text('Проектов пока нет', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 12),
           Text(
-            'Создайте первый проект — ключ используется в номерах задач.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            'Загрузка проектов…',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -156,10 +203,101 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ErrorCard extends ConsumerWidget {
-  const _ErrorCard({required this.message});
+class _SessionErrorState extends StatelessWidget {
+  const _SessionErrorState({required this.message});
 
   final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.error),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.hasProjects,
+    required this.onCreate,
+    this.onClearSearch,
+  });
+
+  final bool hasProjects;
+  final VoidCallback onCreate;
+  final VoidCallback? onClearSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              hasProjects ? Icons.search_off : Icons.folder_outlined,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              hasProjects ? 'Ничего не найдено' : 'Проектов пока нет',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              hasProjects
+                  ? 'Попробуйте изменить поисковый запрос.'
+                  : 'Создайте первый проект — ключ используется в номерах задач.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            if (hasProjects && onClearSearch != null)
+              OutlinedButton.icon(
+                onPressed: onClearSearch,
+                icon: const Icon(Icons.clear),
+                label: const Text('Сбросить поиск'),
+              )
+            else
+              FilledButton.icon(
+                onPressed: onCreate,
+                icon: const Icon(Icons.add),
+                label: const Text('Создать проект'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorCard extends ConsumerWidget {
+  const _ErrorCard({required this.message, this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -178,10 +316,11 @@ class _ErrorCard extends ConsumerWidget {
               color: theme.colorScheme.error,
             ),
             const SizedBox(height: 12),
-            Text(message),
+            Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () => ref.read(projectsProvider.notifier).refresh(),
+              onPressed: onRetry ??
+                  () => ref.read(projectsProvider.notifier).refresh(),
               icon: const Icon(Icons.refresh),
               label: const Text('Повторить'),
             ),
