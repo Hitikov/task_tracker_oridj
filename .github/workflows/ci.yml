@@ -147,7 +147,34 @@ jobs:
       - name: Run tests
         if: steps.server.outputs.exists == 'true'
         working-directory: server
-        run: dart test
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_NAME: arij_test
+          DB_USER: arij
+          DB_PASSWORD: arij_test_password
+          JWT_SECRET: test-secret-that-is-at-least-32-chars
+        run: |
+          DB_READY=0
+          for i in $(seq 1 30); do
+            if command -v pg_isready >/dev/null 2>&1; then
+              if pg_isready -h localhost -p 5432 -U arij >/dev/null 2>&1; then
+                DB_READY=1
+                break
+              fi
+            elif (exec 3<>/dev/tcp/localhost/5432) 2>/dev/null; then
+              DB_READY=1
+              break
+            fi
+            echo "Ожидание PostgreSQL... ($i/30)"
+            sleep 2
+          done
+          if [ "$DB_READY" != 1 ]; then
+            echo "PostgreSQL не ответил за 60 секунд"
+            exit 1
+          fi
+          echo "PostgreSQL готов"
+          dart test
 
   # Этап 3a. Сборка Android: APK для установки и AAB для Google Play.
   build-android:
