@@ -151,6 +151,22 @@ class ApiClient {
   Future<List<Map<String, dynamic>>> getProjectMembers(String projectId) =>
       getList('/api/v1/projects/$projectId/members');
 
+  /// `GET /api/v1/projects/{projectId}/board`.
+  ///
+  /// Возвращает колонки доски: `[{status: Status, tasks: Task[]}]`.
+  Future<List<Map<String, dynamic>>> getBoard(String projectId) =>
+      getList('/api/v1/projects/$projectId/board');
+
+  /// `PATCH /api/v1/tasks/{taskId}/status`.
+  ///
+  /// Меняет статус задачи; тело запроса: `{statusId}`.
+  Future<Map<String, dynamic>> updateTaskStatus(
+    String taskId,
+    String statusId,
+  ) {
+    return patch('/api/v1/tasks/$taskId/status', body: {'statusId': statusId});
+  }
+
   /// Добавляет query-параметры к пути (пустые значения игнорируются).
   String _withQuery(String path, Map<String, String>? query) {
     if (query == null || query.isEmpty) return path;

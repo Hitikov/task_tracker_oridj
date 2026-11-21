@@ -1,4 +1,5 @@
 import '../api/api_client.dart';
+import '../models/board_column.dart';
 import '../models/project_member.dart';
 import '../models/status.dart';
 import '../models/task.dart';
@@ -70,5 +71,17 @@ class TaskRepository {
   Future<List<ProjectMember>> listMembers(String projectId) async {
     final data = await _api.getProjectMembers(projectId);
     return [for (final entry in data) ProjectMember.fromJson(entry)];
+  }
+
+  /// `GET /api/v1/projects/{projectId}/board`.
+  Future<List<BoardColumn>> getBoard(String projectId) async {
+    final data = await _api.getBoard(projectId);
+    return [for (final entry in data) BoardColumn.fromJson(entry)];
+  }
+
+  /// `PATCH /api/v1/tasks/{taskId}/status`.
+  Future<Task> updateTaskStatus(String taskId, String statusId) async {
+    final data = await _api.updateTaskStatus(taskId, statusId);
+    return Task.fromJson(data);
   }
 }
