@@ -39,8 +39,12 @@ info:
 
     ## Задачи
 
-    Задачи, Backlog и Kanban появятся на этапе 2. Схемы `Task`, `TaskCreate`
-    и `TaskUpdate` в эту версию контракта не входят.
+    Этап 2 добавляет задачи Backlog: `Task`, `TaskCreate`, `TaskUpdate`,
+    а также справочники проекта `TaskType` и `Status`. `kind`
+    (epic/task/subtask — уровень иерархии) и `typeId` (bug/feature/custom —
+    классификация) это разные измерения задачи и не смешиваются.
+    Задача получает порядковый `number` в проекте; `key` вычисляется как
+    `<key проекта>-<number>`, например `ARIJ-1`. Kanban появится на этапе 3.
 
     ## Документы
 
@@ -64,6 +68,10 @@ tags:
     description: Проекты и доступ пользователя к ним
   - name: Members
     description: Участники проекта
+  - name: Tasks
+    description: "Задачи Backlog: создание, просмотр, изменение, удаление"
+  - name: Metadata
+    description: Типы задач и статусы проекта
 
 security:
   - bearerAuth: []
@@ -627,13 +635,397 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  # TODO(этап 2): задачи, Backlog и Kanban.
-  # Будущие пути (не входят в версию 0.1.0):
-  #   /api/v1/projects/{id}/tasks
-  #   /api/v1/projects/{id}/tasks/{taskId}
-  #   /api/v1/projects/{id}/task-types
-  #   /api/v1/projects/{id}/statuses
-  # Схемы Task, TaskCreate, TaskUpdate добавить вместе с task_kind/task_type.
+  # --- Этап 2: задачи и справочники проекта ---
+  /api/v1/projects/{id}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Tasks]
+      summary: Задачи проекта (Backlog)
+      description: |
+        Возвращает задачи проекта, отсортированные по `number`
+        (порядок создания). Доступно владельцу и участникам проекта.
+        Пагинация в MVP не предусмотрена.
+      operationId: listProjectTasks
+      responses:
+        '200':
+          description: Список задач проекта
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+              examples:
+                tasks:
+                  summary: Epic с вложенной задачей и сабтаском
+                  value:
+                    - id: 11111111-2222-4333-8444-555555555555
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      number: 1
+                      key: ARIJ-1
+                      kind: epic
+                      typeId: 66666666-7777-4888-9999-000000000001
+                      statusId: 66666666-7777-4888-9999-000000000002
+                      title: Ядро MVP
+                      description: Сквозной сценарий этапа 2
+                      priority: high
+                      assigneeId: null
+                      reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      parentId: null
+                      dueDate: null
+                      createdAt: '2026-11-29T10:00:00.000Z'
+                      updatedAt: '2026-11-29T10:00:00.000Z'
+                    - id: 11111111-2222-4333-8444-555555555556
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      number: 2
+                      key: ARIJ-2
+                      kind: task
+                      typeId: 66666666-7777-4888-9999-000000000001
+                      statusId: 66666666-7777-4888-9999-000000000002
+                      title: CRUD задач на сервере
+                      description: null
+                      priority: medium
+                      assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                      reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      parentId: 11111111-2222-4333-8444-555555555555
+                      dueDate: '2026-12-05'
+                      createdAt: '2026-11-29T10:05:00.000Z'
+                      updatedAt: '2026-11-29T10:05:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Tasks]
+      summary: Создать задачу
+      description: |
+        Создаёт задачу в проекте. `number` назначается сервером как
+        `max(number) + 1` в проекте и не меняется. По умолчанию берутся
+        статус проекта по умолчанию (`To Do`), тип `feature` (если `typeId`
+        не передан) и приоритет `medium`.
+
+        Иерархия: `epic` создаётся без `parentId`; `task` — без `parentId`
+        или с `parentId` на `epic`; `subtask` — только с `parentId` на `task`.
+        Нарушение возвращает `409 task_hierarchy_invalid`.
+      operationId: createProjectTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+            examples:
+              createTask:
+                summary: Задача внутри эпика
+                value:
+                  kind: task
+                  title: CRUD задач на сервере
+                  description: Миграции, маршруты и валидация
+                  priority: high
+                  assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                  parentId: 11111111-2222-4333-8444-555555555555
+                  dueDate: '2026-12-05'
+              createEpic:
+                summary: Эпик без родителя
+                value:
+                  kind: epic
+                  title: Ядро MVP
+                  priority: critical
+      responses:
+        '201':
+          description: Задача создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              examples:
+                created:
+                  summary: Созданная задача
+                  value:
+                    id: 11111111-2222-4333-8444-555555555556
+                    projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                    number: 2
+                    key: ARIJ-2
+                    kind: task
+                    typeId: 66666666-7777-4888-9999-000000000001
+                    statusId: 66666666-7777-4888-9999-000000000002
+                    title: CRUD задач на сервере
+                    description: Миграции, маршруты и валидация
+                    priority: high
+                    assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                    reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    parentId: 11111111-2222-4333-8444-555555555555
+                    dueDate: '2026-12-05'
+                    createdAt: '2026-11-29T10:05:00.000Z'
+                    updatedAt: '2026-11-29T10:05:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '409':
+          description: Нарушена иерархия задач или ссылка вне проекта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                hierarchyInvalid:
+                  summary: Subtask без родителя-задачи
+                  value:
+                    error:
+                      code: task_hierarchy_invalid
+                      message: Subtask может быть вложен только в task
+                      details:
+                        field: parentId
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Tasks]
+      summary: Задача по идентификатору
+      description: Доступна участникам проекта, к которому принадлежит задача.
+      operationId: getTask
+      responses:
+        '200':
+          description: Задача
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              examples:
+                task:
+                  summary: Карточка задачи
+                  value:
+                    id: 11111111-2222-4333-8444-555555555556
+                    projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                    number: 2
+                    key: ARIJ-2
+                    kind: task
+                    typeId: 66666666-7777-4888-9999-000000000001
+                    statusId: 66666666-7777-4888-9999-000000000002
+                    title: CRUD задач на сервере
+                    description: Миграции, маршруты и валидация
+                    priority: high
+                    assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                    reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    parentId: 11111111-2222-4333-8444-555555555555
+                    dueDate: '2026-12-05'
+                    createdAt: '2026-11-29T10:05:00.000Z'
+                    updatedAt: '2026-11-29T10:05:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [Tasks]
+      summary: Обновить задачу
+      description: |
+        Частичное обновление. Менять можно `kind`, `typeId`, `statusId`,
+        `title`, `description`, `priority`, `assigneeId`, `parentId` и
+        `dueDate`; `projectId`, `number` и `key` неизменяемы, `reporterId`
+        остаётся автором задачи. Смена `kind`/`parentId` проверяется по
+        тем же правилам иерархии, что и создание.
+      operationId: updateTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+            examples:
+              reassign:
+                summary: Новый исполнитель и дедлайн
+                value:
+                  assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                  dueDate: '2026-12-05'
+              rename:
+                summary: Переименование и смена приоритета
+                value:
+                  title: CRUD задач на сервере (v2)
+                  priority: critical
+      responses:
+        '200':
+          description: Задача обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              examples:
+                updated:
+                  summary: Обновлённая задача
+                  value:
+                    id: 11111111-2222-4333-8444-555555555556
+                    projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                    number: 2
+                    key: ARIJ-2
+                    kind: task
+                    typeId: 66666666-7777-4888-9999-000000000001
+                    statusId: 66666666-7777-4888-9999-000000000002
+                    title: CRUD задач на сервере (v2)
+                    description: Миграции, маршруты и валидация
+                    priority: critical
+                    assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+                    reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                    parentId: 11111111-2222-4333-8444-555555555555
+                    dueDate: '2026-12-05'
+                    createdAt: '2026-11-29T10:05:00.000Z'
+                    updatedAt: '2026-11-29T12:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '409':
+          description: Нарушена иерархия задач
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                hierarchyInvalid:
+                  summary: Epic с родителем
+                  value:
+                    error:
+                      code: task_hierarchy_invalid
+                      message: Epic не может иметь родителя
+                      details:
+                        field: parentId
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Tasks]
+      summary: Удалить задачу
+      description: |
+        Удаляет задачу вместе с подзадачами (каскадно по `parentId`).
+        Типы и статусы при этом не удаляются.
+      operationId: deleteTask
+      responses:
+        '204':
+          description: Задача удалена
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{id}/task-types:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Metadata]
+      summary: Типы задач проекта
+      description: |
+        Возвращает типы проекта. Базовые типы `bug`, `feature` и `custom`
+        создаются для каждого проекта автоматически; `kind` (epic/task/subtask)
+        сюда не входит — это другое измерение задачи.
+      operationId: listProjectTaskTypes
+      responses:
+        '200':
+          description: Список типов задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskType'
+              examples:
+                taskTypes:
+                  summary: Базовые типы проекта
+                  value:
+                    - id: 66666666-7777-4888-9999-000000000001
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      name: bug
+                      createdAt: '2026-11-29T09:00:00.000Z'
+                    - id: 66666666-7777-4888-9999-000000000003
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      name: feature
+                      createdAt: '2026-11-29T09:00:00.000Z'
+                    - id: 66666666-7777-4888-9999-000000000004
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      name: custom
+                      createdAt: '2026-11-29T09:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/projects/{id}/statuses:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Metadata]
+      summary: Статусы проекта
+      description: |
+        Возвращает статусы проекта в порядке `position`. Базовые статусы
+        `To Do`, `In Progress` и `Done` создаются для каждого проекта
+        автоматически; `isDefault` помечает статус, с которым создаётся
+        новая задача.
+      operationId: listProjectStatuses
+      responses:
+        '200':
+          description: Список статусов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Status'
+              examples:
+                statuses:
+                  summary: Базовые статусы проекта
+                  value:
+                    - id: 66666666-7777-4888-9999-000000000002
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      name: To Do
+                      position: 0
+                      isDefault: true
+                      createdAt: '2026-11-29T09:00:00.000Z'
+                    - id: 66666666-7777-4888-9999-000000000005
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      name: In Progress
+                      position: 1
+                      isDefault: false
+                      createdAt: '2026-11-29T09:00:00.000Z'
+                    - id: 66666666-7777-4888-9999-000000000006
+                      projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+                      name: Done
+                      position: 2
+                      isDefault: false
+                      createdAt: '2026-11-29T09:00:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProjectNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
 components:
   securitySchemes:
@@ -659,6 +1051,14 @@ components:
       in: path
       required: true
       description: UUID пользователя-участника
+      schema:
+        type: string
+        format: uuid
+    TaskId:
+      name: id
+      in: path
+      required: true
+      description: UUID задачи
       schema:
         type: string
         format: uuid
@@ -724,6 +1124,22 @@ components:
                   details:
                     resource: project
                     id: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
+    TaskNotFound:
+      description: Задача не найдена
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            taskNotFound:
+              summary: Задача отсутствует или недоступна
+              value:
+                error:
+                  code: task_not_found
+                  message: Задача не найдена
+                  details:
+                    resource: task
+                    id: 11111111-2222-4333-8444-555555555556
     InternalError:
       description: Внутренняя ошибка сервера
       content:
@@ -765,7 +1181,8 @@ components:
             Машиночитаемый код ошибки в snake_case. Примеры:
             `validation_error`, `unauthorized`, `invalid_credentials`,
             `forbidden`, `project_not_found`, `member_not_found`,
-            `user_not_found`, `email_taken`, `project_key_taken`,
+            `user_not_found`, `task_not_found`, `task_hierarchy_invalid`,
+            `email_taken`, `project_key_taken`,
             `member_exists`, `owner_removal_forbidden`, `internal_error`.
           examples:
             - validation_error
@@ -1008,3 +1425,253 @@ components:
           description: |
             На этапе 1 новый участник всегда получает роль `member`.
             Передача владения и назначение второго `owner` — post-MVP.
+
+    Task:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - projectId
+        - number
+        - key
+        - kind
+        - typeId
+        - statusId
+        - title
+        - description
+        - priority
+        - assigneeId
+        - reporterId
+        - parentId
+        - dueDate
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        projectId:
+          type: string
+          format: uuid
+          readOnly: true
+        number:
+          type: integer
+          minimum: 1
+          readOnly: true
+          description: Порядковый номер задачи в проекте, уникален в пределах проекта
+        key:
+          type: string
+          readOnly: true
+          description: |
+            Человекочитаемый ключ задачи: `<key проекта>-<number>`,
+            например `ARIJ-1`. Вычисляется на сервере, не редактируется.
+          pattern: '^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$'
+          examples:
+            - ARIJ-1
+        kind:
+          type: string
+          enum: [epic, task, subtask]
+          description: |
+            Уровень иерархии (отдельное измерение от `typeId`): `epic` без
+            родителя, `task` — без родителя или внутри `epic`, `subtask` —
+            только внутри `task`.
+        typeId:
+          type: string
+          format: uuid
+          description: |
+            Классификация задачи (bug/feature/custom) — тип из справочника
+            проекта; отдельное измерение от `kind`. Тип чужого проекта
+            принять нельзя.
+        statusId:
+          type: string
+          format: uuid
+          description: Текущий статус задачи; статус должен принадлежать тому же проекту
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        assigneeId:
+          type: [string, 'null']
+          format: uuid
+          description: Исполнитель; `null`, если не назначен
+        reporterId:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Автор задачи; при удалении пользователя задачи не удаляются
+        parentId:
+          type: [string, 'null']
+          format: uuid
+          description: |
+            Родительская задача по правилам `kind`; `null` для `epic` и
+            корневых `task`. Удаление родителя удаляет подзадачи.
+        dueDate:
+          type: [string, 'null']
+          format: date
+          description: Дедлайн (дата без времени); `null`, если не задан
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    TaskCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, title]
+      description: |
+        Создание задачи. `projectId`, `number`, `key`, `reporterId`,
+        `createdAt` и `updatedAt` назначает сервер; статус по умолчанию —
+        статус проекта с `isDefault`, тип по умолчанию — `feature`.
+      properties:
+        kind:
+          type: string
+          enum: [epic, task, subtask]
+        typeId:
+          type: string
+          format: uuid
+          description: Тип задачи; по умолчанию `feature` проекта
+        statusId:
+          type: string
+          format: uuid
+          description: Статус; по умолчанию статус проекта с `isDefault` (`To Do`)
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+          default: medium
+        assigneeId:
+          type: [string, 'null']
+          format: uuid
+          description: Исполнитель должен быть участником проекта
+        parentId:
+          type: [string, 'null']
+          format: uuid
+          description: Родительская задача того же проекта, допустимая для `kind`
+        dueDate:
+          type: [string, 'null']
+          format: date
+      examples:
+        - kind: task
+          title: CRUD задач на сервере
+          priority: high
+          parentId: 11111111-2222-4333-8444-555555555555
+
+    TaskUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: |
+        Частичное обновление. `projectId`, `number`, `key`, `reporterId` и
+        временные метки изменить нельзя.
+      properties:
+        kind:
+          type: string
+          enum: [epic, task, subtask]
+        typeId:
+          type: string
+          format: uuid
+        statusId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        assigneeId:
+          type: [string, 'null']
+          format: uuid
+        parentId:
+          type: [string, 'null']
+          format: uuid
+        dueDate:
+          type: [string, 'null']
+          format: date
+      examples:
+        - priority: critical
+          assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
+
+    TaskType:
+      type: object
+      additionalProperties: false
+      required: [id, projectId, name, createdAt]
+      description: |
+        Тип задачи проекта — измерение `typeId` (bug/feature/custom),
+        не путать с `kind` (epic/task/subtask).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        projectId:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Название типа, уникально в пределах проекта
+          examples:
+            - bug
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Status:
+      type: object
+      additionalProperties: false
+      required: [id, projectId, name, position, isDefault, createdAt]
+      description: Статус задачи проекта; задаёт колонку Backlog/Kanban.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        projectId:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Название статуса, уникально в пределах проекта
+          examples:
+            - To Do
+        position:
+          type: integer
+          minimum: 0
+          description: Порядок статуса в проекте, уникален в пределах проекта
+        isDefault:
+          type: boolean
+          description: |
+            Статус, с которым создаётся новая задача; у проекта ровно один
+            такой статус.
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
