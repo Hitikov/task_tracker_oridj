@@ -10,6 +10,7 @@ import '../models/task_create.dart';
 import '../models/task_filters.dart';
 import '../models/task_type.dart';
 import '../state/tasks_providers.dart';
+import 'kanban_page.dart';
 
 /// Экран Backlog проекта: список задач с фильтрами, сортировкой,
 /// созданием, редактированием и удалением.
@@ -45,6 +46,15 @@ class _BacklogPageState extends ConsumerState<BacklogPage> {
       appBar: AppBar(
         title: Text('Backlog — ${widget.project.key}'),
         actions: [
+          IconButton(
+            tooltip: 'Kanban',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => KanbanPage(project: widget.project),
+              ),
+            ),
+            icon: const Icon(Icons.view_kanban_outlined),
+          ),
           IconButton(
             tooltip: 'Обновить',
             onPressed: () =>
