@@ -96,9 +96,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     setState(() => _submitting = true);
     try {
-      await ref
+      final user = await ref
           .read(authSessionProvider.notifier)
           .login(email: login, password: password);
+      if (!mounted || user == null) return;
+      // Явная навигация: смена `MaterialApp.home` не гарантирует переход,
+      // если Navigator уже создан.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => HomePage(
+            login: login,
+            personController: widget.personController,
+            demoMode: widget.demoMode,
+          ),
+        ),
+      );
     } catch (_) {
       // Ошибка отображается из состояния сессии.
     } finally {
