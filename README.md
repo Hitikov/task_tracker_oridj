@@ -1,10 +1,10 @@
 # Arij — трекер задач для командной работы
 
-> **Статус:** этапы 0–1 завершены. Сервер умеет регистрировать и авторизовать
-> пользователей, управлять проектами и участниками; данные хранятся в PostgreSQL.
-> Клиент использует REST API (`dio` + JWT) и хранит токен в secure storage;
-> демо-вход `12345/12345` доступен с `DEMO_MODE=true`. Отчёт — в
-> [docs/reports/stage-1.md](docs/reports/stage-1.md), план — в
+> **Статус:** этапы 0–3 завершены. Arij умеет регистрировать и авторизовать
+> пользователей, управлять проектами и участниками, создавать Epic/Task/Subtask,
+> показывать задачи в Backlog и менять статусы на Kanban-доске. Данные хранятся
+> в PostgreSQL, клиент общается с сервером через REST API (`dio` + JWT).
+> Демо-сценарий — в [docs/demo-scenario.md](docs/demo-scenario.md), план — в
 > [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Описание проекта
@@ -114,7 +114,8 @@ flutter pub get
 flutter run -d windows
 ```
 
-Демо-вход: логин `12345`, пароль `12345`.
+По умолчанию клиент работает с реальным API: зарегистрируйте аккаунт и войдите.
+Старый демо-вход `12345/12345` доступен только с `--dart-define=DEMO_MODE=true`.
 
 ### Backend и PostgreSQL
 
@@ -133,10 +134,10 @@ Copy-Item .env.example .env   # затем задайте JWT_SECRET
 ## Структура репозитория
 
 ```text
-lib/                 клиентский код Flutter
+lib/                 клиентский код Flutter (экраны, API, Riverpod)
 test/                тесты клиента
-server/              серверный пакет Dart (shelf, PostgreSQL) — этап 0
-docs/                документация: ROADMAP, MVP, CI/CD, архитектура
+server/              серверный пакет Dart (shelf, PostgreSQL, миграции, API)
+docs/                ROADMAP, MVP, архитектура, API, демо-сценарий, отчёты этапов
 .github/workflows/   CI/CD: lint, test, сборки и релиз
 ```
 
@@ -148,6 +149,8 @@ docs/                документация: ROADMAP, MVP, CI/CD, архите
 - [OpenAPI 3.1](docs/api/openapi.yaml)
 - [MVP и MoSCoW-приоритеты](docs/MVP.md)
 - [Локальный запуск (Docker)](docs/local-dev.md)
+- [Демо-сценарий MVP](docs/demo-scenario.md)
+- [Отчёты по этапам](docs/reports/stage-3.md)
 - [CI/CD и релизы](docs/ci-cd.md)
 - [Self-hosted runner](docs/self-hosted-runner.md)
 - [Как внести вклад в проект](CONTRIBUTING.md)

@@ -22,7 +22,7 @@
 | Auth | `agent/stage-1-auth` | `1911591` | register/login/me, Argon2id + JWT, middleware, 65 тестов |
 | Исправление конфига | — | `dd0bb21` | `AppConfig` явно передаётся в `buildHandler()` |
 
-Отчёты: [поток БД](stage-1-db.md), [этап 0](stage-0.md), [план](ROADMAP.md).
+Отчёты: [поток БД](stage-1-db.md), [этап 0](stage-0.md), [план](../ROADMAP.md).
 
 ## Что проверено
 
