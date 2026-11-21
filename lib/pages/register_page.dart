@@ -74,8 +74,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (password.isEmpty) {
       return 'Введите пароль';
     }
-    if (password.length < 6) {
-      return 'Минимум 6 символов';
+    if (password.length < 8) {
+      return 'Минимум 8 символов';
     }
     return null;
   }
