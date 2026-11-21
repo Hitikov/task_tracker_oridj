@@ -1,29 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/person_controller.dart';
+import '../api/api_error.dart';
 import '../auth/demo_auth.dart';
+import '../state/auth_providers.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 
-/// Экран входа в приложение.
+/// Экран входа: реальная авторизация через [AuthSession] (REST API).
 ///
-/// Реальная авторизация пока не подключена. Для демонстрации используется
-/// фиксированная пара логин/пароль; при успехе открывается основная оболочка.
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.personController});
+/// Дополнительно доступен демо-вход `12345/12345` (см. [demoLogin],
+/// [demoPassword]) — локальный, без сети, включён через `DEMO_MODE=true`.
+class LoginPage extends ConsumerStatefulWidget {
+  const LoginPage({super.key, this.demoMode = false});
 
-  final PersonController personController;
+  final bool demoMode;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage> {
   final TextEditingController _loginController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  /// Текст ошибки авторизации (неверный логин/пароль, недоступен сервер и т.п.).
+  /// Текст ошибки ввода (валидация полей, локальный вход).
   /// null — блок ошибки скрыт.
   String? _authError;
 
@@ -52,34 +54,34 @@ class _LoginPageState extends State<LoginPage> {
 
   void _onSubmit() {
     final login = _loginController.text.trim();
-    final status = checkDemoCredentials(
-      login: login,
-      password: _passwordController.text,
-    );
+    final password = _passwordController.text;
+    final status = checkDemoCredentials(login: login, password: password);
 
     switch (status) {
       case DemoAuthStatus.emptyFields:
         setState(() => _authError = 'Введите логин и пароль');
         return;
       case DemoAuthStatus.invalidCredentials:
-        setState(() => _authError = 'Неверный логин или пароль');
-        return;
-      case DemoAuthStatus.success:
+        // В реальном режиме пробуем сервер — он решит.
         break;
+      case DemoAuthStatus.success:
+        if (widget.demoMode) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => HomePage(
+                login: login,
+                personController: ref.read(authRepositoryProvider),
+              ),
+            ),
+          );
+          return;
+        }
     }
 
-    // TODO(backend): заменить на реальный запрос авторизации.
-    // При ответе 401 показывать _authError, при успехе — открывать HomePage.
     setState(() => _authError = null);
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => HomePage(
-          login: login,
-          personController: widget.personController,
-        ),
-      ),
-    );
+    ref
+        .read(authSessionProvider.notifier)
+        .login(email: login, password: password);
   }
 
   Future<void> _openRegistration() async {
@@ -95,6 +97,19 @@ class _LoginPageState extends State<LoginPage> {
     _loginController.text = registeredLogin;
     _passwordController.clear();
     setState(() => _authError = null);
+  }
+
+  /// Ошибка сессии для показа пользователю.
+  String? _sessionErrorText() {
+    final session = ref.watch(authSessionProvider);
+    final error = session.error;
+    if (!session.hasError || error == null) {
+      return null;
+    }
+    if (error is ApiException) {
+      return error.message;
+    }
+    return 'Ошибка входа. Проверьте данные и сеть.';
   }
 
   @override
@@ -186,10 +201,10 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: _onSubmit,
                     child: const Text('Войти'),
                   ),
-                  _AuthErrorBanner(message: _authError),
+                  _AuthErrorBanner(message: _authError ?? _sessionErrorText()),
                   const SizedBox(height: 8),
                   Text(
-                    'Демо-вход: логин и пароль — $demoLogin.',
+                    'Демо-вход: логин и пароль — $demoLogin (только DEMO_MODE).',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -206,63 +221,43 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 /// Блок с сообщением об ошибке авторизации.
-///
-/// Место под сообщение зарезервировано всегда ([_reservedHeight]), даже когда
-/// [message] == null. Поэтому появление ошибки не меняет высоту формы и поля,
-/// ссылка и кнопка «Войти» остаются ровно на своих местах.
 class _AuthErrorBanner extends StatelessWidget {
   const _AuthErrorBanner({required this.message});
 
   final String? message;
 
-  /// Верхний отступ (12) + паддинги контейнера (10 + 10) + строка текста (~22).
-  static const double _reservedHeight = 54;
-
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      height: _reservedHeight,
-      child: AnimatedOpacity(
-        opacity: message == null ? 0 : 1,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-              decoration: BoxDecoration(
-                color: colors.errorContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 20,
-                    color: colors.onErrorContainer,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      // Пробел вместо null — чтобы высота считалась одинаково.
-                      message ?? ' ',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: colors.onErrorContainer),
-                    ),
-                  ),
-                ],
+    if (message == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: colors.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 20,
+              color: colors.onErrorContainer,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: colors.onErrorContainer),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
