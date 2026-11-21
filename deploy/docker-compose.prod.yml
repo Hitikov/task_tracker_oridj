@@ -48,9 +48,10 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    # По умолчанию только HTTP:80 (деплой по IP). Для HTTPS по домену
+    # deploy.sh добавляет docker-compose.tls.yml с портом 443.
     ports:
       - "80:80"
-      - "443:443"
     environment:
       SITE_ADDR: ${SITE_ADDR:?set SITE_ADDR in .env or pass domain/IP to deploy.sh}
     volumes:

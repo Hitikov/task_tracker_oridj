@@ -66,10 +66,15 @@ else
 fi
 
 # 4. Поднимаем postgres + server + Caddy.
-"$DK" compose --env-file .env -f deploy/docker-compose.prod.yml up -d --build
+# Для домена добавляем порт 443 (HTTPS), для IP остаётся только 80.
+COMPOSE_ARGS=(--env-file .env -f deploy/docker-compose.prod.yml)
+if [[ "$SCHEME" == "https" ]]; then
+  COMPOSE_ARGS+=(-f deploy/docker-compose.tls.yml)
+fi
+"$DK" compose "${COMPOSE_ARGS[@]}" up -d --build
 
 echo ""
 echo "Готово:"
 echo "  API:   $API_BASE/health"
 echo "  Web:   $API_BASE/  (если собран deploy/www)"
-echo "  Логи:  $DK compose -f deploy/docker-compose.prod.yml logs -f"
+echo "  Логи:  $DK compose ${COMPOSE_ARGS[*]} logs -f"

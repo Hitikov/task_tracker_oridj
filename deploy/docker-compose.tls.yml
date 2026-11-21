@@ -1,0 +1,6 @@
+# Дополнение к docker-compose.prod.yml для домена: открываем 443,
+# чтобы Caddy мог получить и использовать сертификат Let's Encrypt.
+services:
+  caddy:
+    ports:
+      - "443:443"
