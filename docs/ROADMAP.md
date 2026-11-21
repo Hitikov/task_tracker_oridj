@@ -301,3 +301,4 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 0 | влиты все 5 потоков: гигиена, ADR/OpenAPI, `server/`, Docker, CI; проверки зелёные | `feature/stage-0-foundation`, PR #19 |
 | 21.11.2026 | 0 | этап 0 влит в `main`; архитектура дополнена картой текущего кода и целевым клиентским слоем | `main` (`cdd8cc2`), PR #19 |
 | 21.11.2026 | 1 | создана ветка `feature/stage-1-auth-projects`, начаты миграции и слой БД | `feature/stage-1-auth-projects` |
+| 21.11.2026 | 1 | миграции и слой PostgreSQL проверены на живом Docker, влиты в ветку этапа; отчёт `docs/reports/stage-1-db.md` | `d92e8a0` |
