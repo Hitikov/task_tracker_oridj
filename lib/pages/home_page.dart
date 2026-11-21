@@ -132,9 +132,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               'Раздел находится в разработке.',
           actions: [
             FilledButton.icon(
-              onPressed: () => _selectSection(HomeSection.createTask),
-              icon: const Icon(Icons.add),
-              label: const Text('Создать задачу'),
+              onPressed: () => _selectSection(HomeSection.projects),
+              icon: const Icon(Icons.folder_outlined),
+              label: const Text('Перейти к проектам'),
             ),
             OutlinedButton.icon(
               onPressed: () => _selectSection(HomeSection.roadmap),
@@ -143,11 +143,19 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ],
         ),
-      HomeSection.createTask => const SectionPlaceholder(
+      HomeSection.createTask => SectionPlaceholder(
           icon: Icons.add_task_outlined,
           title: 'Создание задачи',
-          description: 'Форма создания задачи появится на следующем этапе. '
-              'Сейчас в проекте собран только интерфейс приложения.',
+          description: 'Задачи живут внутри проекта. Откройте раздел '
+              '«Проекты», выберите проект и нажмите «Задача», чтобы создать '
+              'эпик, задачу или подзадачу.',
+          actions: [
+            FilledButton.icon(
+              onPressed: () => _selectSection(HomeSection.projects),
+              icon: const Icon(Icons.folder_outlined),
+              label: const Text('Перейти к проектам'),
+            ),
+          ],
         ),
       HomeSection.projects => const ProjectsPage(),
       HomeSection.roadmap => const RoadmapView(),

@@ -6,6 +6,7 @@ import '../models/project.dart';
 import '../models/project_create.dart';
 import '../state/auth_providers.dart';
 import '../state/projects_providers.dart';
+import 'backlog_page.dart';
 
 /// Экран проектов: список + создание нового проекта
 /// (`POST /api/v1/projects`, схема `ProjectCreate`).
@@ -44,6 +45,7 @@ class ProjectsPage extends ConsumerWidget {
                   itemCount: list.length,
                   itemBuilder: (context, index) => _ProjectTile(
                     project: list[index],
+                    onTap: () => _openProject(context, list[index]),
                   ),
                 ),
         ),
@@ -65,12 +67,22 @@ class ProjectsPage extends ConsumerWidget {
       builder: (_) => const _CreateProjectDialog(),
     );
   }
+
+  /// Открывает Backlog выбранного проекта.
+  void _openProject(BuildContext context, Project project) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BacklogPage(project: project),
+      ),
+    );
+  }
 }
 
 class _ProjectTile extends StatelessWidget {
-  const _ProjectTile({required this.project});
+  const _ProjectTile({required this.project, required this.onTap});
 
   final Project project;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +93,7 @@ class _ProjectTile extends StatelessWidget {
       title: Text(project.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(project.key),
       trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }
