@@ -1,25 +1,28 @@
 # Arij — план развития
 
-> Актуально на 21.11.2026. Этот файл — единая точка входа для любой сессии.
+> Актуально на 22.11.2026. Этот файл — единая точка входа для любой сессии.
 > Статусы этапов и журнал обновляются по мере выполнения.
 
 ## 1. Где проект сейчас
 
 | Область | Состояние |
 |---|---|
-| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `cb8ea1f` |
-| Релизы | `v1.1.0` — APK + AAB + Windows zip + `SHA256SUMS.txt`; `v1.0.0` — Windows |
-| CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` |
-| Тесты | 279 серверных + 67 клиентских, зелёные |
-| Клиент | `ApiClient` (dio), secure storage, Riverpod, экраны входа/проектов, Backlog и Kanban с drag & drop |
+| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `d5204a0` |
+| Релизы | `v2.0.0` … `v2.0.3` — APK + AAB + Windows zip + `ArijSetup-x64.exe` + `SHA256SUMS.txt`; ранее `v1.0.0`, `v1.1.0` |
+| CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` публикует в т.ч. Windows-установщик |
+| Тесты | 279 серверных (10 skipped без живой БД) + 84 клиентских, зелёные |
+| Клиент | `ApiClient` (dio), secure storage, Riverpod, экраны входа/проектов, Backlog и Kanban с drag & drop, поиск и фильтры, проверка обновлений, адаптивная вёрстка |
 | Backend | `arij_server`: `/health`, миграции, JWT/Argon2id auth, CRUD проектов/задач, доска и смена статусов |
-| Docker | `docker-compose.yml` с PostgreSQL 16 + сервер, скрипты `scripts/dev-*.ps1`, `docs/local-dev.md` |
+| Docker | `docker-compose.yml` с PostgreSQL 16 + сервер, скрипты `scripts/dev-*.ps1`, `docs/local-dev.md`; прод — Caddy (`deploy/`) |
 | Issues | 10 открытых, размечены labels и milestones |
-| Документы | `docs/MVP.md`, `docs/ROADMAP.md`, `docs/architecture.md`, ADR-0001, OpenAPI 3.1, отчёты `docs/reports/stage-0.md` … `stage-3.md` |
+| Документы | `docs/MVP.md`, `docs/ROADMAP.md`, `docs/architecture.md`, ADR-0001, OpenAPI 3.1, отчёты `docs/reports/stage-0.md` … `stage-5.md` |
 
-**Главный разрыв:** этапы 0–3 завершены — авторизация, проекты, задачи, Backlog
-и Kanban работают через REST API и PostgreSQL. Следующий критический путь —
-полировка MVP (этап 4) и релиз 2.0.0 (этап 5).
+**Главный разрыв:** этапы 0–5 завершены, релизы 2.0.x опубликованы. Основной
+сценарий MVP работает через REST API и PostgreSQL. Следующий критический путь —
+закрыть хвосты MVP: клиентский экран участников (M-07), задача «история
+переходов статусов» и расхождения инфраструктурного контракта (Web-сборка,
+Caddy вместо Nginx). См. отчёты [этапа 4](reports/stage-4.md) и
+[этапа 5](reports/stage-5.md).
 
 ## 2. Принципы
 
@@ -39,10 +42,13 @@
 | 1. Auth → проекты | `feature/stage-1-auth-projects` | 22–28 ноября | регистрация → вход → создание проекта → данные в PostgreSQL | завершён |
 | 2. Задачи → Backlog | `feature/stage-2-tasks-backlog` | 29 ноября – 5 декабря | Epic/Task/Subtask, номер, исполнитель, дедлайн, Backlog | завершён |
 | 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | завершён |
-| 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | роли, валидация, тесты, документация | в работе |
-| 5. Релиз 2.0.0 | `feature/stage-5-release-2.0.0` | 20–26 декабря | APK/AAB/Windows/Web, подпись, GitHub Release | запланирован |
+| 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | валидация, E2E/API-тесты, UI-состояния, документация | завершён (`fbc2635`, PR #28) |
+| 5. Релиз 2.0.x | `release/v2.0.*`, `feature/app-updates`, `feature/ui-polish` | 20–26 декабря | APK/AAB, Windows-установщик, обновления, адаптивный UI | завершён (`d5204a0`, PR #29–#34) |
 
-Буфер: 27–31 декабря — исправление ошибок по итогам демо, без новых функций.
+Этапы 4–5 выполнены досрочно, 21.11.2026. Фактические результаты — в отчётах
+[stage-4.md](reports/stage-4.md) и [stage-5.md](reports/stage-5.md).
+Буфер 27–31 декабря остаётся запланированным на исправления по итогам демо,
+без новых функций.
 Сроки сдвинуты на 4 дня относительно первой версии плана: этап 0 завершён 21.11.
 
 ## 4. Этап 0 — фундамент
@@ -244,6 +250,9 @@
 - Документация готова к защите.
 - Критические ошибки исправлены.
 
+**Результат:** завершён 21.11.2026, PR #28 (`fbc2635`). Подробности —
+[отчёт по этапу 4](reports/stage-4.md).
+
 ## 9. Этап 5 — Релиз 2.0.0
 
 ### Цель
@@ -264,6 +273,10 @@
 - Релиз опубликован, файлы скачиваются, checksums сходятся.
 - APK устанавливается, Windows-архив запускается.
 - Демо проходит по сценарию MVP.
+
+**Результат:** завершён 21.11.2026, PR #29–#34 (`d5204a0`), опубликованы
+`v2.0.0` … `v2.0.3`. Web-сборка и Nginx не реализованы: развёртывание сделано
+на Caddy, расхождение зафиксировано в [отчёте по этапу 5](reports/stage-5.md).
 
 ## 10. Управление issues
 
@@ -313,3 +326,8 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 21.11.2026 | 3 | влиты API доски и клиентский Kanban; e2e To Do → Done и сохранение после рестарта; отчёт `docs/reports/stage-3.md` | `b84426e` |
 | 21.11.2026 | 3 | этап 3 влит в `main` после зелёного CI, PR #26 | `cb8ea1f` |
 | 21.11.2026 | 4 | создана ветка `feature/stage-4-mvp-polish`, начата полировка MVP | `feature/stage-4-mvp-polish` |
+| 21.11.2026 | 4 | влиты E2E/API-тесты, UI-полировка, поиск и явные async-состояния; отчёт `docs/reports/stage-4.md` | `fbc2635`, PR #28 |
+| 21.11.2026 | 5 | релизы `v2.0.0`–`v2.0.3`: APK/AAB, Windows-установщик, `API_BASE_URL`, проверка обновлений, адаптивная вёрстка; отчёт `docs/reports/stage-5.md` | `d5204a0`, PR #29–#34 |
+| 22.11.2026 | — | сверка плана с фактическим состоянием, синхронизация README/ROADMAP/local-dev/ci-cd | `main` |
+| 22.11.2026 | — | автоматическое обновление Windows/Android из GitHub Releases, стабильная release-подпись и возрастающий `versionCode`; описание — [docs/auto-update.md](auto-update.md) | `main` |
+| 23.11.2026 | — | подготовка релиза `v2.0.4`: версия `2.0.4+5`, секреты подписи добавлены в GitHub | `feature/auto-update` |

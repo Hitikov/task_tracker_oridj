@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Разрешает приложению запускать установку скачанного APK. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- Разрешаем HTTP для подключения к серверу по IP. Убрать при переходе на HTTPS. -->
     <application
         android:label="task_tracker_oridj"

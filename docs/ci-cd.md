@@ -35,7 +35,7 @@ Job `lint` на `ubuntu-latest`:
 2. `flutter analyze` — без предупреждений и ошибок.
 
 В Release workflow здесь же проверяется, что тег совпадает с версией из
-`pubspec.yaml`. Например, тег `v1.1.0` требует `version: 1.1.0+N`.
+`pubspec.yaml`. Например, тег `v2.0.4` требует `version: 2.0.4+N`.
 
 ### 2. Test
 
@@ -44,11 +44,17 @@ Job `test` запускается только после успешного `li
 - `flutter test --reporter expanded --coverage`;
 - отчёт покрытия `coverage/lcov.info` прикладывается как artifact на 7 дней.
 
-Покрыты:
+Клиентские тесты (всего 84 на `main` `d5204a0`): `api_client_test.dart`
+(заголовок Bearer, разбор ошибок), `auth_repository_test.dart`,
+`demo_auth_test.dart`, `person_controller_test.dart`, `state_providers_test.dart`,
+`tasks_test.dart` (репозиторий, оптимистичные обновления, фильтры и доска),
+`ui_polish_test.dart` (async-состояния, 1500×800 и узкие экраны),
+`update_service_test.dart`, `widget_test.dart`.
 
-- демо-авторизация (`test/demo_auth_test.dart`);
-- CRUD-логика `PersonController` на in-memory Drift (`test/person_controller_test.dart`);
-- экраны и навигация (`test/widget_test.dart`).
+Отдельный job `backend` (PostgreSQL service) запускает `dart format/analyze/test`
+в `server/`: 279 тестов, 10 интеграционных пропускаются без живой БД.
+E2E-сценарий MVP и граничные случаи API описаны в
+[отчёте этапа 4](reports/stage-4.md).
 
 ### 3. Build
 
@@ -66,6 +72,8 @@ Job `test` запускается только после успешного `li
 - `flutter build windows --release`;
 - содержимое `build/windows/x64/runner/Release/` упаковывается в
   `task_tracker_oridj-<version>-windows-x64.zip`;
+- Inno Setup (`installer/windows/arij.iss`) собирает
+  `ArijSetup-<version>-x64.exe` с ярлыком на рабочий стол;
 - рядом кладётся `SHA256SUMS.txt`.
 
 Версия берётся из `pubspec.yaml`, номер сборки (`+N`) используется как
@@ -75,14 +83,19 @@ Android `versionCode`. Для каждого релиза увеличивайт
 
 Job `deploy` есть только в Release workflow. Он запускается после успешной
 сборки обеих платформ, скачивает артефакты, формирует общий `SHA256SUMS.txt`
-и создаёт GitHub Release с APK, AAB и Windows-архивом.
+и создаёт GitHub Release с APK, AAB, Windows-архивом и установщиком `.exe`.
+Текущие релизы: `v2.0.0` … `v2.0.3`.
 
 Deploy требует `contents: write`; остальные job'ы работают с `contents: read`.
 
 ## Подпись Android
 
-Без секретов APK и AAB подписываются debug-ключом. Такая сборка устанавливается
-вручную, но не подходит для Google Play.
+**Для автообновления release-подпись обязательна.** Без секретов APK и AAB
+подписываются debug-ключом: GitHub-hosted runner создаёт новый debug-keystore
+при каждом запуске, поэтому подпись меняется от релиза к релизу. Android
+отказывается ставить такой APK поверх предыдущей версии
+(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) — пользователю приходится удалять
+приложение. Стабильный release-ключ решает эту проблему.
 
 Для release-подписи добавьте в **Settings → Secrets and variables → Actions**
 четыре секрета:
@@ -120,6 +133,15 @@ keytool -genkeypair -v `
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("android/app/release.jks")) | Set-Clipboard
 ```
 
+### versionCode
+
+`versionCode` берётся из числа после `+` в `pubspec.yaml`. Все старые сборки
+имели `versionCode = 0` (`2.0.0+0` … `2.0.3+0`), поэтому Android мог отказать
+в установке даже при совпадающей подписи. Начиная с `2.0.3+4` число после `+`
+должно **увеличиваться с каждым релизом** (`+5`, `+6`, …). Первый переход на
+стабильный ключ всё равно потребует однократной переустановки: подпись старых
+APK была другой.
+
 ## Локальные проверки перед push
 
 ```powershell
@@ -145,7 +167,7 @@ flutter build windows --release
 1. Обновите версию и build number в `pubspec.yaml`:
 
    ```yaml
-   version: 1.1.0+2
+   version: 2.0.4+5
    ```
 
    Первые три числа — версия приложения, число после `+` — build number.
@@ -156,16 +178,17 @@ flutter build windows --release
 3. Создайте и запушьте тег, совпадающий с версией:
 
    ```powershell
-   git tag v1.1.0
-   git push origin v1.1.0
+   git tag v2.0.4
+   git push origin v2.0.4
    ```
 
 4. Workflow **Release** выполнит lint → test → сборки → deploy и создаст
    GitHub Release с файлами:
 
-   - `task_tracker_oridj-1.1.0-android.apk`;
-   - `task_tracker_oridj-1.1.0-android.aab`;
-   - `task_tracker_oridj-1.1.0-windows-x64.zip`;
+   - `task_tracker_oridj-2.0.4-android.apk`;
+   - `task_tracker_oridj-2.0.4-android.aab`;
+   - `task_tracker_oridj-2.0.4-windows-x64.zip`;
+   - `ArijSetup-2.0.4-x64.exe`;
    - `SHA256SUMS.txt`.
 
 Тег должен указывать на коммит, в котором уже есть актуальный
@@ -175,13 +198,23 @@ flutter build windows --release
 ### Ручной запуск
 
 В GitHub: **Actions → Release → Run workflow**. Укажите существующий тег
-(например, `v1.1.0`) и при необходимости отметьте pre-release.
+(например, `v2.0.4`) и при необходимости отметьте pre-release.
 
 ## Где скачать сборку
 
 - **CI**: вкладка **Actions → нужный запуск → Artifacts**. Android и Windows
   лежат отдельными artifact'ами, срок хранения — 14 дней.
 - **Release**: раздел **Releases** репозитория, файлы хранятся бессрочно.
+
+## Ограничения
+
+- Web-сборки нет: job `build-web` в workflow отсутствует. Базовый URL задаётся
+  build-time константой `--dart-define=API_BASE_URL`, поэтому для Web потребуется
+  отдельная сборка или конфигурация на стороне прокси.
+- Прод-развёртывание использует Caddy (`deploy/`), а не Nginx, описанный в
+  [архитектуре](architecture.md) как reverse proxy для Flutter Web.
+- `API_BASE_URL` нужно передавать при сборке; приложение не переключает сервер
+  в рантайме.
 
 ## Требования к репозиторию
 

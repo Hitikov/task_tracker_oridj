@@ -1,11 +1,13 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/person_controller.dart';
 import '../state/auth_providers.dart';
+import '../updates/update_controller.dart';
 import '../updates/update_dialog.dart';
-import '../updates/update_service.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/roadmap_view.dart';
 import '../widgets/section_placeholder.dart';
@@ -66,14 +68,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     super.initState();
     // Не дёргаем GitHub API в отладочных/тестовых сборках.
     if (!kDebugMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => ref.read(updateControllerProvider.notifier).startAutoUpdates(),
+      );
     }
   }
 
-  Future<void> _checkForUpdate() async {
-    final update = await ref.read(updateServiceProvider).check();
-    if (update == null || !mounted) return;
-    await showUpdateDialog(context, update);
+  /// Ручная проверка из меню: использует тот же поток, что и автообновление.
+  void _checkForUpdate() {
+    unawaited(
+      ref.read(updateControllerProvider.notifier).checkAndInstall(),
+    );
   }
 
   void _logout() {
@@ -91,6 +96,27 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final isWideScreen = MediaQuery.sizeOf(context).width >= 1000;
+    final updateState = ref.watch(updateControllerProvider);
+
+    ref.listen<UpdateState>(updateControllerProvider, (previous, next) {
+      if (!mounted) return;
+      if (next.phase == UpdatePhase.failed &&
+          next.error != null &&
+          previous?.phase != UpdatePhase.failed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Не удалось обновить приложение: ${next.error}'),
+            action:
+                SnackBarAction(label: 'Повторить', onPressed: _checkForUpdate),
+          ),
+        );
+      }
+      if (next.phase == UpdatePhase.ready &&
+          next.update != null &&
+          previous?.phase != UpdatePhase.ready) {
+        unawaited(showUpdateDialog(context, next.update!));
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -115,9 +141,17 @@ class _HomePageState extends ConsumerState<HomePage> {
               icon: const Icon(Icons.view_sidebar_outlined),
             ),
           IconButton(
-            onPressed: _checkForUpdate,
-            tooltip: 'Проверить обновления',
-            icon: const Icon(Icons.system_update),
+            onPressed: updateState.isBusy ? null : _checkForUpdate,
+            tooltip: updateState.isBusy
+                ? 'Обновление выполняется'
+                : 'Проверить обновления',
+            icon: updateState.isBusy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.system_update),
           ),
           IconButton(
             onPressed: _logout,
@@ -138,40 +172,54 @@ class _HomePageState extends ConsumerState<HomePage> {
                 closeOnSelect: true,
               ),
             ),
-      body: Row(
+      body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (isWideScreen) ...[
-            SizedBox(
-              key: const Key('sidebar-panel'),
-              width: _sidebarWidth,
-              child: AppSidebar(
-                login: widget.login,
-                selectedSection: _selectedSection,
-                onSectionSelected: _selectSection,
-                onLogout: _logout,
-              ),
+          if (updateState.phase == UpdatePhase.downloading ||
+              updateState.phase == UpdatePhase.installing)
+            LinearProgressIndicator(
+              value: updateState.phase == UpdatePhase.installing
+                  ? null
+                  : updateState.progress,
             ),
-            MouseRegion(
-              cursor: SystemMouseCursors.resizeLeftRight,
-              child: GestureDetector(
-                key: const Key('sidebar-resize-handle'),
-                behavior: HitTestBehavior.translucent,
-                onHorizontalDragUpdate: (details) =>
-                    _resizeSidebar(details.delta.dx),
-                onDoubleTap: () => setState(() => _sidebarWidth = 280),
-                child: SizedBox(
-                  width: 10,
-                  child: VerticalDivider(
-                    width: 10,
-                    thickness: 2,
-                    color: Theme.of(context).colorScheme.outlineVariant,
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (isWideScreen) ...[
+                  SizedBox(
+                    key: const Key('sidebar-panel'),
+                    width: _sidebarWidth,
+                    child: AppSidebar(
+                      login: widget.login,
+                      selectedSection: _selectedSection,
+                      onSectionSelected: _selectSection,
+                      onLogout: _logout,
+                    ),
                   ),
-                ),
-              ),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.resizeLeftRight,
+                    child: GestureDetector(
+                      key: const Key('sidebar-resize-handle'),
+                      behavior: HitTestBehavior.translucent,
+                      onHorizontalDragUpdate: (details) =>
+                          _resizeSidebar(details.delta.dx),
+                      onDoubleTap: () => setState(() => _sidebarWidth = 280),
+                      child: SizedBox(
+                        width: 10,
+                        child: VerticalDivider(
+                          width: 10,
+                          thickness: 2,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                Expanded(child: _buildContent()),
+              ],
             ),
-          ],
-          Expanded(child: _buildContent()),
+          ),
         ],
       ),
     );

@@ -5,7 +5,7 @@ description: A cross-platform task tracking application using Flutter and Drift/
 environment:
   sdk: '>=3.0.0 <4.0.0' # Ограничение SDK для стабильности
 
-version: 2.0.3+0
+version: 2.0.4+5
 
 dependencies:
   flutter:
@@ -20,6 +20,8 @@ dependencies:
   flutter_riverpod: ^3.5.0
   package_info_plus: ^10.2.2
   url_launcher: ^6.3.1
+  open_filex: ^5.0.0
+  crypto: ^3.0.8
 
 dev_dependencies:
   flutter_test:
