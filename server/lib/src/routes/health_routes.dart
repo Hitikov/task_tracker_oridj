@@ -5,8 +5,8 @@ import '../version.dart';
 
 /// Handles `GET /health`.
 ///
-/// The endpoint is intentionally independent from PostgreSQL: it reports that
-/// the HTTP server is alive. Database readiness is added in stage 1.
+/// The endpoint is intentionally independent from PostgreSQL: it only reports
+/// that the HTTP server is alive. Migrations are applied at startup instead.
 Response healthHandler(Request request) {
   return jsonResponse(<String, Object?>{
     'status': 'ok',

@@ -9,30 +9,46 @@ class UpdateInfo {
   const UpdateInfo({
     required this.version,
     required this.releaseUrl,
+    required this.tag,
     this.downloadUrl,
+    this.assetName,
+    this.checksumUrl,
   });
 
   /// Версия без префикса `v`, например `2.0.2`.
   final String version;
+
+  /// Тег релиза, например `v2.0.2`.
+  final String tag;
 
   /// Страница релиза — запасной вариант, если прямой файл не найден.
   final String releaseUrl;
 
   /// Прямая ссылка на установщик (Windows) или APK (Android).
   final String? downloadUrl;
+
+  /// Имя файла актива — используется как имя локального файла и для SHA256.
+  final String? assetName;
+
+  /// Ссылка на `SHA256SUMS.txt` того же релиза (если есть).
+  final String? checksumUrl;
 }
 
 /// Проверяет последний релиз на GitHub и сравнивает версии.
 class UpdateService {
-  UpdateService({Dio? dio, PackageInfo? packageInfo})
-      : _dio = dio ??
+  UpdateService({
+    Dio? dio,
+    PackageInfo? packageInfo,
+    TargetPlatform? platform,
+  })  : _dio = dio ??
             Dio(
               BaseOptions(
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 5),
               ),
             ),
-        _packageInfo = packageInfo;
+        _packageInfo = packageInfo,
+        _platform = platform ?? defaultTargetPlatform;
 
   static const String _repo = 'Hitikov/task_tracker_oridj';
   static const String _releasesApi =
@@ -40,6 +56,7 @@ class UpdateService {
 
   final Dio _dio;
   final PackageInfo? _packageInfo;
+  final TargetPlatform _platform;
 
   /// Возвращает [UpdateInfo], если на GitHub есть более новая версия.
   ///
@@ -61,13 +78,16 @@ class UpdateService {
       if (!isNewer(latestVersion, info.version)) return null;
 
       final assets = (data['assets'] as List<dynamic>? ?? const <dynamic>[])
-          .whereType<Map<String, dynamic>>();
+          .whereType<Map<String, dynamic>>()
+          .toList();
       String? downloadUrl;
-      final preferred = switch (defaultTargetPlatform) {
-        TargetPlatform.windows ||
-        TargetPlatform.macOS ||
-        TargetPlatform.linux =>
-          '.exe',
+      String? assetName;
+      String? checksumUrl;
+
+      // Автоустановка поддерживается только для Windows (.exe) и Android (.apk).
+      // Для остальных платформ открывается страница релиза.
+      final preferred = switch (_platform) {
+        TargetPlatform.windows => '.exe',
         TargetPlatform.android => '.apk',
         _ => null,
       };
@@ -76,16 +96,27 @@ class UpdateService {
           final name = asset['name'] as String? ?? '';
           if (name.toLowerCase().endsWith(preferred)) {
             downloadUrl = asset['browser_download_url'] as String?;
+            assetName = name;
             break;
           }
+        }
+      }
+      for (final asset in assets) {
+        final name = asset['name'] as String? ?? '';
+        if (name == 'SHA256SUMS.txt') {
+          checksumUrl = asset['browser_download_url'] as String?;
+          break;
         }
       }
 
       return UpdateInfo(
         version: latestVersion,
+        tag: tag,
         releaseUrl: (data['html_url'] as String?) ??
             'https://github.com/$_repo/releases/latest',
         downloadUrl: downloadUrl,
+        assetName: assetName,
+        checksumUrl: checksumUrl,
       );
     } catch (_) {
       return null;

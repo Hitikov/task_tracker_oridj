@@ -24,6 +24,11 @@ DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+; Обновление поверх уже установленной версии: закрываем приложение и
+; перезапускаем его после установки (можно также передать флаги
+; /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS из автообновления).
+CloseApplications=yes
+RestartApplications=yes
 OutputDir={#OutputDir}
 OutputBaseFilename=ArijSetup-{#MyAppVersion}-x64
 SetupIconFile=..\..\windows\runner\resources\app_icon.ico
