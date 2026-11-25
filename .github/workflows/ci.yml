@@ -154,6 +154,7 @@ jobs:
           DB_USER: arij
           DB_PASSWORD: arij_test_password
           JWT_SECRET: test-secret-that-is-at-least-32-chars
+          REQUIRE_DB: 'true'
         run: |
           DB_READY=0
           for i in $(seq 1 30); do
@@ -254,10 +255,10 @@ jobs:
           echo "ANDROID_SIGNING=release" >> "$GITHUB_ENV"
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://localhost:8080' }}
 
       - name: Build AAB
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://localhost:8080' }}
 
       - name: Package artifacts
         run: |
@@ -313,7 +314,7 @@ jobs:
           "version=$($line.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
 
       - name: Build Windows release
-        run: flutter build windows --release
+        run: flutter build windows --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://localhost:8080' }}
 
       - name: Package artifact
         shell: pwsh

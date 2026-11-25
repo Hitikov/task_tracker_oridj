@@ -53,6 +53,10 @@ abstract interface class TaskRepository {
   /// Task by id (the UUID string); returns `null` when absent.
   Future<Task?> findTaskById(String taskId);
 
+  /// Direct children of [taskId]; used to reject `kind` changes that the
+  /// `trg_tasks_recheck_children` database trigger would otherwise reject.
+  Future<List<Task>> findChildTasks(String taskId);
+
   /// Inserts a new task and assigns a unique `number` within the project:
   /// `SELECT COALESCE(MAX(number), 0) + 1 ...` inside a transaction, retried
   /// when the concurrent insert loses the `(project_id, number)` unique
@@ -177,6 +181,17 @@ class PostgresTaskRepository implements TaskRepository {
       return null;
     }
     return _taskFromRow(result.first);
+  }
+
+  @override
+  Future<List<Task>> findChildTasks(String taskId) async {
+    final result = await _db.query(
+      'SELECT $_taskColumns '
+      'FROM tasks t JOIN projects p ON p.id = t.project_id '
+      'WHERE t.parent_id = \$1 ORDER BY t.number',
+      parameters: <Object?>[taskId],
+    );
+    return <Task>[for (final row in result) _taskFromRow(row)];
   }
 
   /// Builds a [Task] from a joined row; `key` is `<project key>-<number>`.

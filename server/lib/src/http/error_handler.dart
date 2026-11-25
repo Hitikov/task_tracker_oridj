@@ -1,4 +1,5 @@
 import 'package:logging/logging.dart';
+import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 
 import 'api_exception.dart';
@@ -30,6 +31,35 @@ Middleware errorHandler() {
           error.code,
           error.message,
           details: error.details,
+        );
+      } on ServerException catch (error, stackTrace) {
+        // Invalid values that slipped past validation must not become 500:
+        // map the SQLSTATE of a rejected literal/constraint to a client error.
+        final code = error.code;
+        if (code == '22P02' ||
+            code == '22007' ||
+            code == '23503' ||
+            code == '23514') {
+          _log.warning(
+            'requestId=$requestId ${request.method} ${request.requestedUri.path} '
+            'rejected by database constraint $code',
+          );
+          return errorResponse(
+            400,
+            'validation_error',
+            'Некорректные данные запроса',
+          );
+        }
+        _log.severe(
+          'requestId=$requestId ${request.method} ${request.requestedUri.path} '
+          'failed with a database error',
+          error,
+          stackTrace,
+        );
+        return errorResponse(
+          500,
+          'internal_error',
+          'Внутренняя ошибка сервера',
         );
       } on Object catch (error, stackTrace) {
         _log.severe(

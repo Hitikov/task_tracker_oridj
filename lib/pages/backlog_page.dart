@@ -766,6 +766,7 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
             dueDate: _dueDate,
             clearDueDate: _dueDate == null,
             parentId: _parentId,
+            clearParentId: _parentId == null,
           ),
         );
       }

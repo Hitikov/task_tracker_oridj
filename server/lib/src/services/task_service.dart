@@ -18,7 +18,9 @@ class TaskService {
   /// Repository to `tasks`, `task_types`, `statuses` and project access.
   final TaskRepository repository;
 
-  static const int _maxTitleLength = 255;
+  // Must match the CHECK constraints of `tasks` and `docs/api/openapi.yaml`.
+  static const int _maxTitleLength = 200;
+  static const int _maxDescriptionLength = 5000;
 
   /// A date in the past is not a valid deadline.
   DateTime get _now => DateTime.now().toUtc();
@@ -84,17 +86,18 @@ class TaskService {
   /// - `task` — without a parent or inside an `epic`;
   /// - `subtask` — only inside a `task`.
   ///
-  /// `typeId`/`statusId` must belong to the project. `title` is required,
-  /// `kind` and `priority` must be valid enum values, `dueDate` may not be
-  /// in the past.
+  /// `typeId` defaults to the project's `feature` type and `statusId` to its
+  /// default column. `title` is required, `kind` and `priority` must be valid
+  /// enum values, `dueDate` may not be in the past. The assignee must be a
+  /// member of the project.
   Future<Task> createTask({
     required String userId,
     required String projectId,
     required String title,
     required String kind,
-    required String typeId,
+    String? typeId,
     String statusId = '',
-    required String priority,
+    String? priority,
     String? description,
     String? assigneeId,
     String? parentId,
@@ -104,30 +107,39 @@ class TaskService {
     final effectiveStatusId = statusId.isNotEmpty
         ? statusId
         : await _defaultStatusId(projectId);
+    final effectiveTypeId = typeId != null && typeId.isNotEmpty
+        ? typeId
+        : await _defaultTypeId(projectId);
+    final effectivePriority = priority ?? 'medium';
     _validateCreateInput(
       title: title,
       kind: kind,
-      typeId: typeId,
+      typeId: effectiveTypeId,
       statusId: effectiveStatusId,
-      priority: priority,
+      priority: effectivePriority,
+      description: description,
       dueDate: dueDate,
     );
-    if (await repository.findTaskType(projectId, typeId) == null) {
+    if (await repository.findTaskType(projectId, effectiveTypeId) == null) {
       throw const ValidationException('typeId');
     }
     if (await repository.findStatus(projectId, effectiveStatusId) == null) {
       throw const ValidationException('statusId');
+    }
+    if (assigneeId != null &&
+        await repository.findProjectRole(projectId, assigneeId) == null) {
+      throw const ValidationException('assigneeId');
     }
     await _validateHierarchy(projectId, kind, parentId);
 
     return repository.createTask(
       projectId: projectId,
       kind: kind,
-      typeId: typeId,
+      typeId: effectiveTypeId,
       statusId: effectiveStatusId,
       title: title.trim(),
       description: description?.trim(),
-      priority: priority,
+      priority: effectivePriority,
       assigneeId: assigneeId,
       reporterId: userId,
       parentId: parentId,
@@ -166,13 +178,17 @@ class TaskService {
             throw const ValidationException('title');
           }
           final name = value.trim();
-          if (name.isEmpty || name.length > _maxTitleLength) {
+          if (name.isEmpty || name.runes.length > _maxTitleLength) {
             throw const ValidationException('title');
           }
           updates['title'] = name;
         case 'description':
           final value = entry.value;
           if (value != null && value is! String) {
+            throw const ValidationException('description');
+          }
+          if (value is String &&
+              value.trim().runes.length > _maxDescriptionLength) {
             throw const ValidationException('description');
           }
           updates['description'] = value;
@@ -213,6 +229,10 @@ class TaskService {
           if (value != null && value is! String) {
             throw const ValidationException('assigneeId');
           }
+          if (value is String &&
+              await repository.findProjectRole(task.projectId, value) == null) {
+            throw const ValidationException('assigneeId');
+          }
           updates['assigneeId'] = value;
         case 'parentId':
           final value = entry.value;
@@ -241,6 +261,19 @@ class TaskService {
     final parentId = parentIdProvided ? providedParentId : task.parentId;
     if (kindProvided || parentIdProvided) {
       await _validateHierarchy(task.projectId, kind, parentId);
+    }
+    if (kindProvided && kind != task.kind) {
+      final children = await repository.findChildTasks(taskId);
+      final allowedChildKind = switch (kind) {
+        'epic' => 'task',
+        'task' => 'subtask',
+        _ => null,
+      };
+      if (children.isNotEmpty &&
+          (allowedChildKind == null ||
+              children.any((child) => child.kind != allowedChildKind))) {
+        throw const ValidationException('kind');
+      }
     }
     if (providedDueDate != null && providedDueDate.isBefore(_now)) {
       throw const ValidationException('dueDate');
@@ -302,17 +335,34 @@ class TaskService {
     throw const ValidationException('statusId');
   }
 
+  /// Returns the project's `feature` type, or its first type, so a request
+  /// without `typeId` stays valid against OpenAPI.
+  Future<String> _defaultTypeId(String projectId) async {
+    final types = await repository.listTaskTypes(projectId);
+    for (final type in types) {
+      if (type.name == 'feature') return type.id;
+    }
+    if (types.isNotEmpty) return types.first.id;
+    throw const ValidationException('typeId');
+  }
+
   void _validateCreateInput({
     required String title,
     required String kind,
     required String typeId,
     required String statusId,
     required String priority,
+    String? description,
     DateTime? dueDate,
   }) {
     final normalizedTitle = title.trim();
-    if (normalizedTitle.isEmpty || normalizedTitle.length > _maxTitleLength) {
+    if (normalizedTitle.isEmpty ||
+        normalizedTitle.runes.length > _maxTitleLength) {
       throw const ValidationException('title');
+    }
+    if (description != null &&
+        description.trim().runes.length > _maxDescriptionLength) {
+      throw const ValidationException('description');
     }
     if (!taskKinds.contains(kind)) {
       throw const ValidationException('kind');

@@ -4,7 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'update_service.dart';
 
 /// Показывает диалог с доступным обновлением.
-Future<void> showUpdateDialog(BuildContext context, UpdateInfo update) async {
+///
+/// [onInstall] передаётся только когда файл уже скачан: установка начинается
+/// исключительно после нажатия кнопки пользователем.
+Future<void> showUpdateDialog(
+  BuildContext context,
+  UpdateInfo update, {
+  Future<void> Function()? onInstall,
+}) async {
   final theme = Theme.of(context);
   final target = Uri.parse(update.downloadUrl ?? update.releaseUrl);
 
@@ -23,12 +30,16 @@ Future<void> showUpdateDialog(BuildContext context, UpdateInfo update) async {
           child: const Text('Позже'),
         ),
         FilledButton.icon(
-          onPressed: () {
+          onPressed: () async {
             Navigator.of(dialogContext).pop();
-            launchUrl(target, mode: LaunchMode.externalApplication);
+            if (onInstall != null) {
+              await onInstall();
+            } else {
+              await launchUrl(target, mode: LaunchMode.externalApplication);
+            }
           },
-          icon: const Icon(Icons.download),
-          label: const Text('Скачать'),
+          icon: const Icon(Icons.system_update_alt),
+          label: Text(onInstall != null ? 'Установить' : 'Скачать'),
         ),
       ],
     ),

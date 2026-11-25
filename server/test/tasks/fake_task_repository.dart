@@ -124,6 +124,10 @@ class FakeTaskRepository implements TaskRepository {
   Future<Task?> findTaskById(String taskId) async => _tasks[taskId];
 
   @override
+  Future<List<Task>> findChildTasks(String taskId) async =>
+      List.unmodifiable(_tasks.values.where((task) => task.parentId == taskId));
+
+  @override
   Future<Task> createTask({
     required String projectId,
     required String kind,

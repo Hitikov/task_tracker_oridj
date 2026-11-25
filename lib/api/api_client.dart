@@ -16,7 +16,7 @@ import 'api_error.dart';
 /// - Логирование — только метод, путь и статус: ни токены, ни пароли,
 ///   ни тела ответов.
 class ApiClient {
-  ApiClient({Dio? dio, this.getToken, String? baseUrl})
+  ApiClient({Dio? dio, this.getToken, this.onUnauthorized, String? baseUrl})
       : _dio = dio ??
             Dio(
               BaseOptions(
@@ -29,7 +29,7 @@ class ApiClient {
                 receiveDataWhenStatusError: true,
               ),
             ) {
-    _dio.interceptors.add(_BearerInterceptor(getToken));
+    _dio.interceptors.add(_BearerInterceptor(getToken, onUnauthorized));
     _dio.interceptors.add(_SanitizedLogger());
   }
 
@@ -37,6 +37,9 @@ class ApiClient {
 
   /// Текущий токен или null.
   final FutureOr<String?> Function()? getToken;
+
+  /// Вызывается при ответе 401: удалить токен и сбросить сессию.
+  final Future<void> Function()? onUnauthorized;
 
   /// Возвращает объект по схеме `User`/`Project` (мапим в репозитории).
   Future<Map<String, dynamic>> get(String path) async {
@@ -58,7 +61,10 @@ class ApiClient {
       if (data == null) {
         return const <Map<String, dynamic>>[];
       }
-      return [for (final entry in data) entry as Map<String, dynamic>];
+      return [
+        for (final entry in data)
+          if (entry is Map<String, dynamic>) entry,
+      ];
     } on DioException catch (e) {
       throw e.asApiException();
     }
@@ -182,9 +188,10 @@ class ApiClient {
 
 /// Перехватчик, прикладывающий `Authorization: Bearer <токен>`.
 class _BearerInterceptor implements Interceptor {
-  const _BearerInterceptor(this._getToken);
+  const _BearerInterceptor(this._getToken, this._onUnauthorized);
 
   final FutureOr<String?> Function()? _getToken;
+  final Future<void> Function()? _onUnauthorized;
 
   @override
   void onRequest(
@@ -203,8 +210,20 @@ class _BearerInterceptor implements Interceptor {
       handler.next(response);
 
   @override
-  void onError(DioException error, ErrorInterceptorHandler handler) =>
-      handler.next(error);
+  void onError(DioException error, ErrorInterceptorHandler handler) {
+    if (error.response?.statusCode == 401) {
+      unawaited(_clearSession());
+    }
+    handler.next(error);
+  }
+
+  Future<void> _clearSession() async {
+    try {
+      await _onUnauthorized?.call();
+    } on Object {
+      // Не скрываем исходную ошибку, если очистка сессии не удалась.
+    }
+  }
 }
 
 /// Логгер без чувствительных данных.

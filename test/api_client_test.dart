@@ -92,7 +92,11 @@ void main() {
         },
         statusCode: 401,
       );
-      final client = ApiClient(dio: _makeDio(adapter));
+      var unauthorizedCalls = 0;
+      final client = ApiClient(
+        dio: _makeDio(adapter),
+        onUnauthorized: () async => unauthorizedCalls++,
+      );
 
       Object? error;
       try {
@@ -107,6 +111,7 @@ void main() {
       expect(apiError.message, 'Требуется аутентификация');
       expect(apiError.isUnauthorized, isTrue);
       expect(apiError.details, isNull);
+      expect(unauthorizedCalls, 1);
     });
 
     test('details из конверта сохраняются', () async {

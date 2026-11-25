@@ -47,7 +47,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (login.isEmpty) {
       return 'Введите email';
     }
-    if (login == demoLogin) {
+    if (widget.demoMode && login == demoLogin) {
       return null;
     }
     if (!_emailRegExp.hasMatch(login)) {
@@ -61,7 +61,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (password.isEmpty) {
       return 'Введите пароль';
     }
-    if (_loginController.text.trim() == demoLogin && password == demoPassword) {
+    if (widget.demoMode &&
+        _loginController.text.trim() == demoLogin &&
+        password == demoPassword) {
       return null;
     }
     if (password.length < 8) {
@@ -88,6 +90,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           builder: (_) => HomePage(
             login: login,
             personController: widget.personController,
+            demoMode: true,
           ),
         ),
       );
@@ -257,13 +260,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     _AuthErrorBanner(message: errorText),
                     const SizedBox(height: 8),
-                    Text(
-                      'Демо-вход: логин и пароль — $demoLogin (только DEMO_MODE).',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    if (widget.demoMode)
+                      Text(
+                        'Демо-вход: логин и пароль — $demoLogin.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

@@ -68,10 +68,10 @@ final updateDownloaderProvider =
 final updateInstallerProvider =
     Provider<UpdateInstaller>((ref) => const UpdateInstaller());
 
-/// Оркестратор: проверка GitHub Releases → скачивание → установка.
+/// Оркестратор: проверка GitHub Releases → скачивание → ожидание согласия.
 ///
-/// Приложение проверяет обновления при старте и каждые 6 часов. Для Windows
-/// установка беззвучная, для Android открывается системный установщик APK.
+/// Приложение проверяет обновления при старте и каждые 6 часов. Установка
+/// выполняется только по явному действию пользователя через [installPrepared].
 final updateControllerProvider =
     NotifierProvider<UpdateController, UpdateState>(UpdateController.new);
 
@@ -89,11 +89,39 @@ class UpdateController extends Notifier<UpdateState> {
   void startAutoUpdates({Duration interval = const Duration(hours: 6)}) {
     if (_autoStarted) return;
     _autoStarted = true;
-    unawaited(checkAndInstall());
-    _timer = Timer.periodic(interval, (_) => unawaited(checkAndInstall()));
+    unawaited(checkForUpdate());
+    _timer = Timer.periodic(interval, (_) => unawaited(checkForUpdate()));
   }
 
-  /// Проверяет релиз, скачивает подходящий файл и запускает установку.
+  /// Проверяет релиз и скачивает файл, но не устанавливает его.
+  ///
+  /// Пользователь подтверждает установку в диалоге обновления.
+  Future<void> checkForUpdate() => checkAndInstall();
+
+  /// Устанавливает уже скачанный файл после явного подтверждения.
+  Future<void> installPrepared() async {
+    final update = state.update;
+    final path = state.downloadedPath;
+    if (update == null || path == null || state.phase != UpdatePhase.ready) {
+      return;
+    }
+    state = state.copyWith(
+      phase: UpdatePhase.installing,
+      clearError: true,
+    );
+    try {
+      await ref.read(updateInstallerProvider).install(update, path);
+      state = const UpdateState();
+    } on Object catch (error) {
+      state = UpdateState(
+        phase: UpdatePhase.failed,
+        update: update,
+        error: error.toString(),
+      );
+    }
+  }
+
+  /// Проверяет релиз, скачивает подходящий файл и ждёт подтверждения.
   Future<void> checkAndInstall() async {
     if (state.isBusy) return;
     state = state.copyWith(
@@ -130,12 +158,10 @@ class UpdateController extends Notifier<UpdateState> {
       );
 
       state = state.copyWith(
-        phase: UpdatePhase.installing,
+        phase: UpdatePhase.ready,
         downloadedPath: file.path,
         progress: 1,
       );
-      await ref.read(updateInstallerProvider).install(update, file.path);
-      state = const UpdateState();
     } on Object catch (error) {
       state = UpdateState(
         phase: UpdatePhase.failed,

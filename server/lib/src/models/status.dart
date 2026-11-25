@@ -19,9 +19,13 @@ class Status {
       projectId: row['project_id'] as String,
       name: row['name'] as String,
       // В БД statuses нет отдельной колонки key — код выводим из названия.
+      // `To Do` в OpenAPI обозначен как `todo`, а не `to_do`.
       key:
           row['key'] as String? ??
-          (row['name'] as String).toLowerCase().replaceAll(RegExp(r'\s+'), '_'),
+          switch ((row['name'] as String).toLowerCase()) {
+            'to do' => 'todo',
+            final name => name.replaceAll(RegExp(r'\s+'), '_'),
+          },
       position: row['position'] as int,
       isDefault: row['is_default'] as bool,
     );

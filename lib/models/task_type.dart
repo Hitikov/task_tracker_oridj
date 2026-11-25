@@ -27,11 +27,12 @@ class TaskType {
   /// Необязательный цвет для чипа (`#RRGGBB`).
   final String? color;
 
+  /// Сервер возвращает только `id`, `projectId`, `name`, `createdAt`;
+  /// устаревшее поле `color` в контракт не входит.
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'projectId': projectId,
         'name': name,
-        'color': color,
       };
 
   @override

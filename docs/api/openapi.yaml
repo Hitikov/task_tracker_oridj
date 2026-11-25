@@ -692,7 +692,7 @@ paths:
                       assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
                       reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
                       parentId: 11111111-2222-4333-8444-555555555555
-                      dueDate: '2026-12-05'
+                      dueDate: '2026-12-05T00:00:00.000Z'
                       createdAt: '2026-11-29T10:05:00.000Z'
                       updatedAt: '2026-11-29T10:05:00.000Z'
         '401':
@@ -732,7 +732,7 @@ paths:
                   priority: high
                   assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
                   parentId: 11111111-2222-4333-8444-555555555555
-                  dueDate: '2026-12-05'
+                  dueDate: '2026-12-05T00:00:00.000Z'
               createEpic:
                 summary: Эпик без родителя
                 value:
@@ -763,7 +763,7 @@ paths:
                     assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
                     reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
                     parentId: 11111111-2222-4333-8444-555555555555
-                    dueDate: '2026-12-05'
+                    dueDate: '2026-12-05T00:00:00.000Z'
                     createdAt: '2026-11-29T10:05:00.000Z'
                     updatedAt: '2026-11-29T10:05:00.000Z'
         '400':
@@ -775,20 +775,20 @@ paths:
         '404':
           $ref: '#/components/responses/ProjectNotFound'
         '409':
-          description: Нарушена иерархия задач или ссылка вне проекта
+          description: Не удалось назначить уникальный номер задачи
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               examples:
-                hierarchyInvalid:
-                  summary: Subtask без родителя-задачи
+                numberRace:
+                  summary: Гонка при нумерации задач проекта
                   value:
                     error:
-                      code: task_hierarchy_invalid
-                      message: Subtask может быть вложен только в task
+                      code: task_number_race
+                      message: Не удалось присвоить задаче уникальный номер в проекте
                       details:
-                        field: parentId
+                        projectId: b7e6c1d2-4a3f-4c5d-8e9f-0a1b2c3d4e5f
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -824,7 +824,7 @@ paths:
                     assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
                     reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
                     parentId: 11111111-2222-4333-8444-555555555555
-                    dueDate: '2026-12-05'
+                    dueDate: '2026-12-05T00:00:00.000Z'
                     createdAt: '2026-11-29T10:05:00.000Z'
                     updatedAt: '2026-11-29T10:05:00.000Z'
         '401':
@@ -856,7 +856,7 @@ paths:
                 summary: Новый исполнитель и дедлайн
                 value:
                   assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
-                  dueDate: '2026-12-05'
+                  dueDate: '2026-12-05T00:00:00.000Z'
               rename:
                 summary: Переименование и смена приоритета
                 value:
@@ -886,7 +886,7 @@ paths:
                     assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
                     reporterId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
                     parentId: 11111111-2222-4333-8444-555555555555
-                    dueDate: '2026-12-05'
+                    dueDate: '2026-12-05T00:00:00.000Z'
                     createdAt: '2026-11-29T10:05:00.000Z'
                     updatedAt: '2026-11-29T12:00:00.000Z'
         '400':
@@ -897,21 +897,6 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/TaskNotFound'
-        '409':
-          description: Нарушена иерархия задач
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                hierarchyInvalid:
-                  summary: Epic с родителем
-                  value:
-                    error:
-                      code: task_hierarchy_invalid
-                      message: Epic не может иметь родителя
-                      details:
-                        field: parentId
         '500':
           $ref: '#/components/responses/InternalError'
     delete:
@@ -1328,8 +1313,8 @@ components:
             Машиночитаемый код ошибки в snake_case. Примеры:
             `validation_error`, `unauthorized`, `invalid_credentials`,
             `forbidden`, `project_not_found`, `member_not_found`,
-            `user_not_found`, `task_not_found`, `task_hierarchy_invalid`,
-            `email_taken`, `project_key_taken`,
+            `user_not_found`, `task_not_found`, `task_number_race`,
+            `email_taken`, `project_key_taken`, `payload_too_large`,
             `member_exists`, `owner_removal_forbidden`, `internal_error`.
           examples:
             - validation_error
@@ -1661,8 +1646,8 @@ components:
             корневых `task`. Удаление родителя удаляет подзадачи.
         dueDate:
           type: [string, 'null']
-          format: date
-          description: Дедлайн (дата без времени); `null`, если не задан
+          format: date-time
+          description: Дедлайн в ISO 8601 (UTC); `null`, если не задан
         createdAt:
           type: string
           format: date-time
@@ -1713,7 +1698,7 @@ components:
           description: Родительская задача того же проекта, допустимая для `kind`
         dueDate:
           type: [string, 'null']
-          format: date
+          format: date-time
       examples:
         - kind: task
           title: CRUD задач на сервере
@@ -1755,7 +1740,7 @@ components:
           format: uuid
         dueDate:
           type: [string, 'null']
-          format: date
+          format: date-time
       examples:
         - priority: critical
           assigneeId: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f

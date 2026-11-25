@@ -2,12 +2,12 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Разрешает приложению запускать установку скачанного APK. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-    <!-- Разрешаем HTTP для подключения к серверу по IP. Убрать при переходе на HTTPS. -->
+    <!-- Релизные сборки используют HTTPS; открытый HTTP-трафик запрещён. -->
     <application
         android:label="task_tracker_oridj"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

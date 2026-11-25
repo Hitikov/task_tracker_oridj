@@ -35,7 +35,7 @@ Future<void> main() async {
 
   test(
     'applies migrations to a live PostgreSQL',
-    skip: available ? null : 'База недоступна: запустите PostgreSQL',
+    skip: databaseSkipReason(available),
     () async {
       final database = Database(AppConfig.fromEnvironment(environment));
       await database.open();

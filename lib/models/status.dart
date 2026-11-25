@@ -8,21 +8,26 @@ class Status {
     required this.id,
     required this.projectId,
     required this.name,
-    this.color,
+    this.key = '',
     this.position = 0,
-    this.isDone = false,
-  });
+    bool? isDefault,
+    this.color,
+    bool? isDone,
+  })  : isDefault = isDefault ?? isDone ?? false,
+        isDone = isDone ?? isDefault ?? false;
 
   factory Status.fromJson(Map<String, dynamic> json) {
+    final key = json['key'] as String? ?? '';
     return Status(
       id: json['id'] as String? ?? '',
       projectId: json['projectId'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      color: json['color'] as String?,
+      key: key,
       position: (json['position'] as num?)?.toInt() ??
           (json['order'] as num?)?.toInt() ??
           0,
-      isDone: json['isDone'] as bool? ?? false,
+      isDefault: json['isDefault'] as bool? ?? false,
+      isDone: key == 'done',
     );
   }
 
@@ -30,22 +35,28 @@ class Status {
   final String projectId;
   final String name;
 
-  /// Необязательный цвет статуса (`#RRGGBB`).
-  final String? color;
+  /// Код статуса из OpenAPI (`todo`, `in_progress`, `done`, ...).
+  final String key;
 
   /// Порядок в списке (для сортировки).
   final int position;
 
-  /// Признак финального статуса (`Done`).
+  /// Статус по умолчанию для новых задач проекта.
+  final bool isDefault;
+
+  /// Устаревший алиас: финальный статус (`done`). Не отправляется в API.
   final bool isDone;
+
+  /// Устаревшее поле; сервер его не возвращает.
+  final String? color;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'projectId': projectId,
         'name': name,
-        'color': color,
+        'key': key,
         'position': position,
-        'isDone': isDone,
+        'isDefault': isDefault,
       };
 
   @override

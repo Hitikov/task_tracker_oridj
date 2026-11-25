@@ -11,10 +11,8 @@ import 'update_service.dart';
 /// Скачивает архив обновления во временную папку и проверяет его SHA256
 /// по файлу `SHA256SUMS.txt` из того же релиза.
 class UpdateDownloader {
-  UpdateDownloader({
-    Dio? dio,
-    Future<Directory> Function()? directory,
-  })  : _dio = dio ??
+  UpdateDownloader({Dio? dio, Future<Directory> Function()? directory})
+      : _dio = dio ??
             Dio(
               BaseOptions(
                 connectTimeout: const Duration(seconds: 15),
@@ -57,23 +55,30 @@ class UpdateDownloader {
 
   /// Сверяет SHA256 скачанного файла со значением из `SHA256SUMS.txt`.
   ///
-  /// Если файл сумм недоступен — проверка пропускается (релизы без сумм
-  /// считаются допустимыми). При расхождении — [StateError].
+  /// Отсутствие файла сумм, сетевая ошибка или отсутствие записи для ассета
+  /// блокируют установку: обновление без проверки целостности опасно.
   Future<void> verifyChecksum(File file, UpdateInfo update) async {
     final checksumUrl = update.checksumUrl;
-    if (checksumUrl == null || checksumUrl.isEmpty) return;
+    if (checksumUrl == null || checksumUrl.isEmpty) {
+      throw StateError('В релизе нет SHA256SUMS.txt — установка запрещена');
+    }
 
     final String sums;
     try {
       final response = await _dio.get<String>(checksumUrl);
       sums = response.data ?? '';
     } on Object {
-      // Отсутствие файла сумм не блокирует обновление.
-      return;
+      throw StateError(
+        'Не удалось получить SHA256SUMS.txt — установка запрещена',
+      );
     }
 
     final expected = _findHash(sums, update.assetName ?? '');
-    if (expected == null) return;
+    if (expected == null || !RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(expected)) {
+      throw StateError(
+        'В SHA256SUMS.txt нет корректной суммы для ${update.assetName}',
+      );
+    }
     final actual = sha256.convert(await file.readAsBytes()).toString();
     if (actual.toLowerCase() != expected.toLowerCase()) {
       throw StateError('SHA256 обновления не совпал: файл повреждён');

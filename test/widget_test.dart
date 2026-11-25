@@ -36,8 +36,8 @@ void main() {
   }
 
   Future<void> login(WidgetTester tester) async {
-    await tester.enterText(find.byType(TextField).at(0), '12345');
-    await tester.enterText(find.byType(TextField).at(1), '12345');
+    await tester.enterText(find.byType(TextField).at(0), 'user@example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'secret123');
     await tester.tap(find.widgetWithText(FilledButton, 'Войти'));
     await tester.pumpAndSettle();
   }
@@ -134,7 +134,7 @@ void main() {
     expect(find.text('Демо работы с БД'), findsNothing);
   });
 
-  testWidgets('регистрация возвращает email на экран входа', (tester) async {
+  testWidgets('регистрация сразу открывает главный экран', (tester) async {
     await pumpApp(tester);
 
     await tester.tap(find.widgetWithText(TextButton, 'Зарегистрироваться'));
@@ -154,13 +154,10 @@ void main() {
 
     expect(find.text('Вы зарегистрированы'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Перейти ко входу'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Продолжить'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Вход в Arij'), findsOneWidget);
-    final loginField = tester.widget<TextField>(find.byType(TextField).first);
-    // Осознанное обновление: после регистрации возвращаем email — логин
-    // заполняется им.
-    expect(loginField.controller?.text, 'new@example.com');
+    expect(find.text('Вход в Arij'), findsNothing);
+    expect(find.text('Дашборд'), findsWidgets);
   });
 }

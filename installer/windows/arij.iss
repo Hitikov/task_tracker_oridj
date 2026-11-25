@@ -2,7 +2,7 @@
 ; Собирается в CI: iscc arij.iss /DMyAppVersion=<версия> /DSourceDir=<папка Release> /DOutputDir=dist
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.0"
+  #define MyAppVersion "2.0.5"
 #endif
 #ifndef SourceDir
   #define SourceDir "build\windows\x64\runner\Release"

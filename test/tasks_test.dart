@@ -105,6 +105,23 @@ void main() {
     });
   });
 
+  test('critical priority round-trips with the API contract', () {
+    expect(TaskPriority.fromWire('critical'), TaskPriority.critical);
+    expect(TaskPriority.critical.wire, 'critical');
+    expect(
+      const TaskUpdate(priority: TaskPriority.critical).toJson()['priority'],
+      'critical',
+    );
+  });
+
+  test('clearParentId sends null and clears the local task', () {
+    const update = TaskUpdate(clearParentId: true);
+    expect(update.toJson(), {'parentId': null});
+
+    final task = _task(parentId: 'epic-1');
+    expect(task.applyUpdate(update).parentId, isNull);
+  });
+
   group('TaskRepository', () {
     test('listTasks maps tasks from API', () async {
       final api = FakeApiClient(
@@ -459,22 +476,22 @@ void main() {
   });
 
   group('TaskFilters query', () {
-    test('toQuery includes active filters and sort', () {
+    test('toQuery uses only server-supported filter names', () {
       const filters = TaskFilters(
         search: 'bug',
         kind: TaskKind.task,
         statusId: 's1',
+        assigneeId: 'u1',
         sortField: TaskSortField.priority,
         sortAscending: false,
       );
 
       expect(filters.toQuery(), {
-        'search': 'bug',
         'kind': 'task',
-        'statusId': 's1',
-        'sort': 'priority',
-        'order': 'desc',
+        'status': 's1',
+        'assignee': 'u1',
       });
+      expect(filters.apply, isNotNull);
     });
   });
 

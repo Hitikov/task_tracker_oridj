@@ -1,7 +1,7 @@
-import 'dart:convert';
-
 import 'package:shelf/shelf.dart';
 
+import '../http/api_exception.dart';
+import '../http/json_body.dart';
 import '../http/json_response.dart';
 import '../middleware/auth_middleware.dart';
 import '../repositories/user_repository.dart';
@@ -22,13 +22,20 @@ class AuthRoutes {
   /// `400 validation_error` on invalid input.
   Future<Response> register(Request request) async {
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final auth = await service.register(
         email: _requiredString(body, 'email'),
         password: _requiredString(body, 'password'),
         name: _requiredString(body, 'name'),
       );
       return jsonResponse(auth.toJson(), statusCode: 201);
+    } on ApiException catch (error) {
+      return errorResponse(
+        error.statusCode,
+        error.code,
+        error.message,
+        details: error.details,
+      );
     } on ValidationException catch (error) {
       return _validationError(error);
     } on EmailTakenException {
@@ -47,12 +54,19 @@ class AuthRoutes {
   /// `400 validation_error`.
   Future<Response> login(Request request) async {
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final auth = await service.login(
         email: _requiredString(body, 'email'),
         password: _requiredString(body, 'password'),
       );
       return jsonResponse(auth.toJson());
+    } on ApiException catch (error) {
+      return errorResponse(
+        error.statusCode,
+        error.code,
+        error.message,
+        details: error.details,
+      );
     } on ValidationException catch (error) {
       return _validationError(error);
     } on InvalidCredentialsException {
@@ -88,20 +102,7 @@ class AuthRoutes {
     );
   }
 
-  Future<Map<String, dynamic>> _readBody(Request request) async {
-    Object? decoded;
-    try {
-      decoded = jsonDecode(await request.readAsString());
-    } on FormatException {
-      decoded = null;
-    }
-    if (decoded is! Map<String, dynamic>) {
-      throw ValidationException(null);
-    }
-    return decoded;
-  }
-
-  String _requiredString(Map<String, dynamic> body, String field) {
+  String _requiredString(Map<String, Object?> body, String field) {
     final value = body[field];
     if (value is! String || value.trim().isEmpty) {
       throw ValidationException(field);

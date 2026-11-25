@@ -1,8 +1,8 @@
-import 'dart:convert';
-
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
+import '../http/api_exception.dart';
+import '../http/json_body.dart';
 import '../http/json_response.dart';
 import '../middleware/auth_middleware.dart';
 import '../repositories/task_repository.dart';
@@ -67,16 +67,16 @@ class TaskRoutes {
       return _invalidPath();
     }
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final task = await service.createTask(
         userId: user.id,
         projectId: projectId,
         title: _requiredString(body, 'title'),
         kind: _requiredString(body, 'kind'),
-        typeId: _requiredString(body, 'typeId'),
-        // `statusId` необязателен по OpenAPI: сервер выберет статус по умолчанию.
+        // `typeId`, `statusId` и `priority` необязательны по OpenAPI.
+        typeId: _optionalString(body, 'typeId'),
         statusId: _optionalString(body, 'statusId') ?? '',
-        priority: _requiredString(body, 'priority'),
+        priority: _optionalString(body, 'priority'),
         description: _optionalString(body, 'description'),
         assigneeId: _optionalString(body, 'assigneeId'),
         parentId: _optionalString(body, 'parentId'),
@@ -118,7 +118,7 @@ class TaskRoutes {
       return _invalidPath();
     }
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final fields = <String, Object?>{};
       for (final field in <String>[
         'title',
@@ -214,6 +214,14 @@ class TaskRoutes {
   /// envelope; rethrows anything unexpected (the global error middleware
   /// turns it into `500 internal_error`).
   Response _errorResponse(Object error) {
+    if (error is ApiException) {
+      return errorResponse(
+        error.statusCode,
+        error.code,
+        error.message,
+        details: error.details,
+      );
+    }
     if (error is ValidationException) {
       return errorResponse(
         400,
@@ -261,19 +269,6 @@ class TaskRoutes {
     'Некорректные данные запроса',
     details: const <String, Object?>{'field': 'id'},
   );
-
-  Future<Map<String, Object?>> _readBody(Request request) async {
-    Object? decoded;
-    try {
-      decoded = jsonDecode(await request.readAsString());
-    } on FormatException {
-      decoded = null;
-    }
-    if (decoded is! Map<String, dynamic>) {
-      throw const ValidationException(null);
-    }
-    return Map<String, Object?>.from(decoded);
-  }
 
   String _requiredString(Map<String, Object?> body, String field) {
     final value = body[field];

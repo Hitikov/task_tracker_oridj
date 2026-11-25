@@ -1,28 +1,30 @@
 # Arij — план развития
 
-> Актуально на 22.11.2026. Этот файл — единая точка входа для любой сессии.
+> Актуально на 25.11.2026. Этот файл — единая точка входа для любой сессии.
 > Статусы этапов и журнал обновляются по мере выполнения.
 
 ## 1. Где проект сейчас
 
 | Область | Состояние |
 |---|---|
-| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `d5204a0` |
-| Релизы | `v2.0.0` … `v2.0.3` — APK + AAB + Windows zip + `ArijSetup-x64.exe` + `SHA256SUMS.txt`; ранее `v1.0.0`, `v1.1.0` |
-| CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` публикует в т.ч. Windows-установщик |
-| Тесты | 279 серверных (10 skipped без живой БД) + 84 клиентских, зелёные |
+| Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `b8e6649`; готовится ветка `release/v2.0.5-security` |
+| Релизы | `v2.0.0` … `v2.0.4` — APK + AAB + Windows zip + `ArijSetup-x64.exe` + `SHA256SUMS.txt`; `v2.0.5+6` готовится с исправлениями аудита |
+| CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` требует HTTPS `API_BASE_URL` и release-подпись Android, E2E больше не пропускаются молча |
+| Тесты | 283 серверных (10 skipped без живой БД) + 97 клиентских, зелёные |
 | Клиент | `ApiClient` (dio), secure storage, Riverpod, экраны входа/проектов, Backlog и Kanban с drag & drop, поиск и фильтры, проверка обновлений, адаптивная вёрстка |
 | Backend | `arij_server`: `/health`, миграции, JWT/Argon2id auth, CRUD проектов/задач, доска и смена статусов |
 | Docker | `docker-compose.yml` с PostgreSQL 16 + сервер, скрипты `scripts/dev-*.ps1`, `docs/local-dev.md`; прод — Caddy (`deploy/`) |
 | Issues | 10 открытых, размечены labels и milestones |
 | Документы | `docs/MVP.md`, `docs/ROADMAP.md`, `docs/architecture.md`, ADR-0001, OpenAPI 3.1, отчёты `docs/reports/stage-0.md` … `stage-5.md` |
 
-**Главный разрыв:** этапы 0–5 завершены, релизы 2.0.x опубликованы. Основной
-сценарий MVP работает через REST API и PostgreSQL. Следующий критический путь —
-закрыть хвосты MVP: клиентский экран участников (M-07), задача «история
-переходов статусов» и расхождения инфраструктурного контракта (Web-сборка,
-Caddy вместо Nginx). См. отчёты [этапа 4](reports/stage-4.md) и
-[этапа 5](reports/stage-5.md).
+**Главный разрыв:** этапы 0–5 завершены, релизы 2.0.x опубликованы, основной
+сценарий MVP работает через REST API и PostgreSQL. Аудит безопасности от
+25.11.2026 закрыл критические дефекты (приоритет `critical`, обработку 401,
+валидации БД, целостность и согласие при автообновлении, HTTPS и подпись релизов).
+Ближайший критический путь: **выпустить `v2.0.5`**, затем закрыть хвосты MVP —
+клиентский экран участников (M-07), историю переходов статусов, Web-сборку и
+расхождение Caddy/Nginx в документации. См. [этап 4](reports/stage-4.md) и
+[этап 5](reports/stage-5.md).
 
 ## 2. Принципы
 
@@ -44,6 +46,7 @@ Caddy вместо Nginx). См. отчёты [этапа 4](reports/stage-4.md)
 | 3. Kanban | `feature/stage-3-kanban` | 6–12 декабря | колонки, drag & drop, смена статуса | завершён |
 | 4. Полировка MVP | `feature/stage-4-mvp-polish` | 13–19 декабря | валидация, E2E/API-тесты, UI-состояния, документация | завершён (`fbc2635`, PR #28) |
 | 5. Релиз 2.0.x | `release/v2.0.*`, `feature/app-updates`, `feature/ui-polish` | 20–26 декабря | APK/AAB, Windows-установщик, обновления, адаптивный UI | завершён (`d5204a0`, PR #29–#34) |
+| 6. Безопасность и хвосты MVP | `release/v2.0.5-security`, `feature/stage-6-mvp-tails` | 25–30 ноября | исправления аудита, релиз `v2.0.5`, экран участников (M-07), история статусов | в работе |
 
 Этапы 4–5 выполнены досрочно, 21.11.2026. Фактические результаты — в отчётах
 [stage-4.md](reports/stage-4.md) и [stage-5.md](reports/stage-5.md).
@@ -305,6 +308,9 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | Рассогласование команды | labels, milestones, assignees, ежедневная синхронизация, PR-ревью |
 | Релизные долги | `applicationId` и release-подпись — до `v2.0.0` |
 | Мало тестов на API | PostgreSQL service в CI + интеграционные тесты с этапа 1 |
+| Уязвимости цепочки обновлений | SHA256 fail-closed, установка только после согласия, обязательная release-подпись |
+| Передача JWT по открытому HTTP | Релиз собирается только с HTTPS `API_BASE_URL`; IP-развёртывание — только для разработки |
+| Прошедшие релизы с дефектами | выпуск `v2.0.5` с исправлениями и обновлёнными release notes |
 
 ## 12. Журнал
 
@@ -331,3 +337,5 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | 22.11.2026 | — | сверка плана с фактическим состоянием, синхронизация README/ROADMAP/local-dev/ci-cd | `main` |
 | 22.11.2026 | — | автоматическое обновление Windows/Android из GitHub Releases, стабильная release-подпись и возрастающий `versionCode`; описание — [docs/auto-update.md](auto-update.md) | `main` |
 | 23.11.2026 | — | подготовка релиза `v2.0.4`: версия `2.0.4+5`, секреты подписи добавлены в GitHub | `feature/auto-update` |
+| 25.11.2026 | 6 | аудит 5 агентами и исправления: приоритет `critical`, 401/сессия, валидации и лимиты API, fail-closed обновления с согласия, HTTPS и release-подпись, PostgreSQL в release CI, деплой с `main`; 283 серверных и 97 клиентских тестов зелёные | `release/v2.0.5-security` |
+| 25.11.2026 | 6 | синхронизация плана с фактом, подготовка версии `2.0.5+6` и Windows-установщика | `release/v2.0.5-security` |

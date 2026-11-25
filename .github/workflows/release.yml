@@ -119,6 +119,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: arij_test
+          POSTGRES_USER: arij
+          POSTGRES_PASSWORD: arij_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -168,7 +183,29 @@ jobs:
       - name: Run tests
         if: steps.server.outputs.exists == 'true'
         working-directory: server
-        run: dart test
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_NAME: arij_test
+          DB_USER: arij
+          DB_PASSWORD: arij_test_password
+          JWT_SECRET: test-secret-that-is-at-least-32-chars
+          REQUIRE_DB: 'true'
+        run: |
+          DB_READY=0
+          for i in $(seq 1 30); do
+            if (exec 3<>/dev/tcp/localhost/5432) 2>/dev/null; then
+              DB_READY=1
+              break
+            fi
+            echo "Ожидание PostgreSQL... ($i/30)"
+            sleep 2
+          done
+          if [ "$DB_READY" != 1 ]; then
+            echo "PostgreSQL не ответил за 60 секунд"
+            exit 1
+          fi
+          dart test
 
   # Этап 3a. Сборка Android: APK для установки и AAB для Google Play.
   build-android:
@@ -178,6 +215,7 @@ jobs:
       - test
       - backend
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 40
 
     steps:
@@ -220,9 +258,8 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
-            echo "Release keystore не задан: APK и AAB будут подписаны debug-ключом."
-            echo "ANDROID_SIGNING=debug" >> "$GITHUB_ENV"
-            exit 0
+            echo "::error::Для публичного релиза обязательна release-подпись: задайте ANDROID_KEYSTORE_*"
+            exit 1
           fi
 
           if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || [ -z "${ANDROID_KEY_ALIAS:-}" ] || [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
@@ -240,11 +277,20 @@ jobs:
           } > android/key.properties
           echo "ANDROID_SIGNING=release" >> "$GITHUB_ENV"
 
+      - name: Validate API base URL
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::API_BASE_URL должен быть https://..." ; exit 1 ;;
+          esac
+
       - name: Build APK
-        run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://144.31.170.81' }}
+        run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
 
       - name: Build AAB
-        run: flutter build appbundle --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://144.31.170.81' }}
+        run: flutter build appbundle --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
 
       - name: Package artifacts
         run: |
@@ -290,8 +336,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Validate API base URL
+        shell: pwsh
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          if (-not $env:API_BASE_URL.StartsWith('https://')) {
+            throw "API_BASE_URL должен быть https://..."
+          }
+
       - name: Build Windows release
-        run: flutter build windows --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://144.31.170.81' }}
+        run: flutter build windows --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
 
       - name: Package release
         shell: pwsh
@@ -344,6 +399,7 @@ jobs:
       - build-android
       - build-windows
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 10
     permissions:
       contents: write
@@ -385,10 +441,8 @@ jobs:
               Также можно перенести APK на телефон и открыть, разрешив установку из неизвестных источников.
             - `task_tracker_oridj-${{ needs.lint.outputs.version }}-android.aab` — формат для загрузки в Google Play Console.
 
-            APK и AAB подписаны release-ключом, если в репозитории настроены секреты
-            `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
-            и `ANDROID_KEY_PASSWORD`. Без них используется debug-подпись: такая сборка
-            устанавливается вручную, но не подходит для публикации в Google Play.
+            APK и AAB подписаны release-ключом. Публикация без секретов
+            `ANDROID_KEYSTORE_*` запрещена workflow.
 
             ### Windows
 
@@ -400,9 +454,9 @@ jobs:
 
             ### Вход
 
-            Приложения подключены к `http://144.31.170.81`. Зарегистрируйте аккаунт
-            и войдите. Старый демо-вход `12345/12345` доступен только при сборке
-            с `--dart-define=DEMO_MODE=true`.
+            Приложения подключены к API по HTTPS (`vars.API_BASE_URL`). Без HTTPS
+            сборка не публикуется. Демо-вход `12345/12345` доступен только при
+            сборке с `--dart-define=DEMO_MODE=true`.
 
             ### Проверка целостности
 

@@ -77,7 +77,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// Ручная проверка из меню: использует тот же поток, что и автообновление.
   void _checkForUpdate() {
     unawaited(
-      ref.read(updateControllerProvider.notifier).checkAndInstall(),
+      ref.read(updateControllerProvider.notifier).checkForUpdate(),
     );
   }
 
@@ -114,7 +114,15 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (next.phase == UpdatePhase.ready &&
           next.update != null &&
           previous?.phase != UpdatePhase.ready) {
-        unawaited(showUpdateDialog(context, next.update!));
+        unawaited(
+          showUpdateDialog(
+            context,
+            next.update!,
+            onInstall: next.downloadedPath == null
+                ? null
+                : ref.read(updateControllerProvider.notifier).installPrepared,
+          ),
+        );
       }
     });
 
