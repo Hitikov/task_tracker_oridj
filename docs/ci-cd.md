@@ -85,7 +85,7 @@ Job `deploy` есть только в Release workflow. Он запускает�
 сборки обеих платформ, скачивает артефакты, формирует общий `SHA256SUMS.txt`
 и создаёт GitHub Release с APK, AAB, Windows-архивом и установщиком `.exe`.
 Текущие релизы: `v2.0.0` … `v2.0.4`; готовится `v2.0.5` с исправлениями аудита.
-Release требует HTTPS `API_BASE_URL` и настроенных секретов `ANDROID_KEYSTORE_*`.
+Release требует заданного `API_BASE_URL` (`https://<домен>` или `http://<IP>`) и секретов `ANDROID_KEYSTORE_*`. Для IP-адреса включён HTTP с предупреждением: JWT передаётся без TLS.
 
 Deploy требует `contents: write`; остальные job'ы работают с `contents: read`.
 

@@ -283,7 +283,9 @@ jobs:
         run: |
           case "$API_BASE_URL" in
             https://*) ;;
-            *) echo "::error::API_BASE_URL должен быть https://..." ; exit 1 ;;
+            http://[0-9]*.[0-9]*.[0-9]*.[0-9]*)
+              echo "::warning::Релиз по IP использует открытый HTTP: JWT передаётся без TLS" ;;
+            *) echo "::error::API_BASE_URL должен быть https://<домен> или http://<IP>" ; exit 1 ;;
           esac
 
       - name: Build APK
@@ -341,8 +343,13 @@ jobs:
         env:
           API_BASE_URL: ${{ vars.API_BASE_URL }}
         run: |
-          if (-not $env:API_BASE_URL.StartsWith('https://')) {
-            throw "API_BASE_URL должен быть https://..."
+          $url = $env:API_BASE_URL
+          if ($url -match '^https://') {
+            # Предпочтительный вариант.
+          } elseif ($url -match '^http://\d+\.\d+\.\d+\.\d+/?$') {
+            Write-Host "::warning::Релиз по IP использует открытый HTTP: JWT передаётся без TLS"
+          } else {
+            throw "API_BASE_URL должен быть https://<домен> или http://<IP>"
           }
 
       - name: Build Windows release
@@ -454,9 +461,10 @@ jobs:
 
             ### Вход
 
-            Приложения подключены к API по HTTPS (`vars.API_BASE_URL`). Без HTTPS
-            сборка не публикуется. Демо-вход `12345/12345` доступен только при
-            сборке с `--dart-define=DEMO_MODE=true`.
+            Адрес API задаётся переменной `vars.API_BASE_URL`. Для домена используется
+            HTTPS; для IP — HTTP с предупреждением: в этом режиме JWT передаётся
+            без TLS, поэтому используйте доверенную сеть. Демо-вход `12345/12345`
+            доступен только при сборке с `--dart-define=DEMO_MODE=true`.
 
             ### Проверка целостности
 
