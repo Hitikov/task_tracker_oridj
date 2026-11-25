@@ -1,36 +1,20 @@
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:task_tracker_oridj/api/person_controller.dart';
 import 'package:task_tracker_oridj/app/arij_app.dart';
-import 'package:task_tracker_oridj/database/app_database.dart';
-import 'package:task_tracker_oridj/repositories/person_repository.dart';
 import 'package:task_tracker_oridj/state/auth_providers.dart';
 
 import 'fakes.dart';
 
 void main() {
-  late AppDatabase db;
-  late PersonController personController;
-
-  setUp(() {
-    db = AppDatabase(NativeDatabase.memory());
-    personController = PersonController(PersonRepository(db));
-  });
-
-  tearDown(() async {
-    await db.close();
-  });
-
   Future<void> pumpApp(WidgetTester tester, {FakeAuthSession? session}) {
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
           authSessionProvider.overrideWith(() => session ?? FakeAuthSession()),
         ],
-        child: ArijApp(personController: personController),
+        child: const ArijApp(),
       ),
     );
   }

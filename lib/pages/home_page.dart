@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/person_controller.dart';
 import '../models/project.dart';
 import '../state/auth_providers.dart';
 import '../state/members_providers.dart';
@@ -23,14 +22,10 @@ class HomePage extends ConsumerStatefulWidget {
   const HomePage({
     super.key,
     required this.login,
-    this.personController,
     this.demoMode = false,
   });
 
   final String login;
-
-  /// Для открытия демо-страницы работы с БД (legacy Drift).
-  final PersonController? personController;
 
   /// Демо-режим: локальный вход `12345/12345` без сервера.
   final bool demoMode;
@@ -88,10 +83,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.read(authSessionProvider.notifier).logout();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => LoginPage(
-          demoMode: widget.demoMode,
-          personController: widget.personController,
-        ),
+        builder: (_) => LoginPage(demoMode: widget.demoMode),
       ),
     );
   }

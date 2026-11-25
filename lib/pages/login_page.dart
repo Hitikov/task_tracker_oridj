@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/person_controller.dart';
 import '../api/api_error.dart';
 import '../auth/demo_auth.dart';
 import '../state/auth_providers.dart';
@@ -13,12 +12,9 @@ import 'register_page.dart';
 /// Дополнительно доступен демо-вход `12345/12345` (см. [demoLogin],
 /// [demoPassword]) — локальный, без сети, включён через `DEMO_MODE=true`.
 class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key, this.demoMode = false, this.personController});
+  const LoginPage({super.key, this.demoMode = false});
 
   final bool demoMode;
-
-  /// Для открытия демо-страницы работы с БД (legacy Drift).
-  final PersonController? personController;
 
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
@@ -89,7 +85,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         MaterialPageRoute<void>(
           builder: (_) => HomePage(
             login: login,
-            personController: widget.personController,
             demoMode: true,
           ),
         ),
@@ -109,7 +104,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         MaterialPageRoute<void>(
           builder: (_) => HomePage(
             login: login,
-            personController: widget.personController,
             demoMode: widget.demoMode,
           ),
         ),
