@@ -16,10 +16,6 @@ import 'package:task_tracker_oridj/repositories/task_repository.dart';
 import 'package:task_tracker_oridj/state/auth_providers.dart';
 import 'package:task_tracker_oridj/state/projects_providers.dart';
 import 'package:task_tracker_oridj/state/tasks_providers.dart';
-import 'package:task_tracker_oridj/database/app_database.dart';
-import 'package:task_tracker_oridj/repositories/person_repository.dart';
-import 'package:task_tracker_oridj/api/person_controller.dart';
-import 'package:drift/native.dart';
 
 import 'fakes.dart';
 
@@ -82,18 +78,6 @@ void _set1500x800(WidgetTester tester) {
 
 void main() {
   group('1500x800 overflow', () {
-    late AppDatabase db;
-    late PersonController personController;
-
-    setUp(() {
-      db = AppDatabase(NativeDatabase.memory());
-      personController = PersonController(PersonRepository(db));
-    });
-
-    tearDown(() async {
-      await db.close();
-    });
-
     testWidgets('экран входа без overflow', (tester) async {
       _set1500x800(tester);
       await tester.pumpWidget(
@@ -101,7 +85,7 @@ void main() {
           overrides: [
             authSessionProvider.overrideWith(() => FakeAuthSession()),
           ],
-          child: ArijApp(personController: personController),
+          child: const ArijApp(),
         ),
       );
       await tester.pumpAndSettle();
@@ -394,28 +378,13 @@ void main() {
   });
 
   group('адаптивная вёрстка', () {
-    late AppDatabase db;
-    late PersonController personController;
-
-    setUp(() {
-      db = AppDatabase(NativeDatabase.memory());
-      personController = PersonController(PersonRepository(db));
-    });
-
-    tearDown(() async {
-      await db.close();
-    });
-
     testWidgets('ширину бокового меню можно менять перетаскиванием',
         (tester) async {
       _set1500x800(tester);
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp(
-            home: HomePage(
-              login: 'user@example.com',
-              personController: personController,
-            ),
+            home: const HomePage(login: 'user@example.com'),
           ),
         ),
       );
@@ -446,7 +415,7 @@ void main() {
           overrides: [
             authSessionProvider.overrideWith(() => FakeAuthSession()),
           ],
-          child: ArijApp(personController: personController),
+          child: const ArijApp(),
         ),
       );
       await tester.pumpAndSettle();
