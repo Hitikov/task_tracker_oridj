@@ -82,15 +82,14 @@ class TaskFilters {
       TaskFilters(sortField: sortField, sortAscending: sortAscending);
 
   /// Query-параметры для `GET /api/v1/projects/{id}/tasks`.
+  ///
+  /// Сервер понимает только `status`, `assignee`, `priority` и `kind`;
+  /// поиск, тип и сортировка применяются локально в [apply].
   Map<String, String> toQuery() => <String, String>{
-        if (search.trim().isNotEmpty) 'search': search.trim(),
         if (kind != null) 'kind': kind!.wire,
-        if (typeId != null) 'typeId': typeId!,
-        if (statusId != null) 'statusId': statusId!,
-        if (assigneeId != null) 'assigneeId': assigneeId!,
+        if (statusId != null) 'status': statusId!,
+        if (assigneeId != null) 'assignee': assigneeId!,
         if (priority != null) 'priority': priority!.wire,
-        'sort': sortField.name,
-        'order': sortAscending ? 'asc' : 'desc',
       };
 
   /// Фильтрует и сортирует список задач.

@@ -84,7 +84,8 @@ Android `versionCode`. Для каждого релиза увеличивайт
 Job `deploy` есть только в Release workflow. Он запускается после успешной
 сборки обеих платформ, скачивает артефакты, формирует общий `SHA256SUMS.txt`
 и создаёт GitHub Release с APK, AAB, Windows-архивом и установщиком `.exe`.
-Текущие релизы: `v2.0.0` … `v2.0.3`.
+Текущие релизы: `v2.0.0` … `v2.0.4`; готовится `v2.0.5` с исправлениями аудита.
+Release требует HTTPS `API_BASE_URL` и настроенных секретов `ANDROID_KEYSTORE_*`.
 
 Deploy требует `contents: write`; остальные job'ы работают с `contents: read`.
 

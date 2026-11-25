@@ -1,8 +1,8 @@
-import 'dart:convert';
-
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
+import '../http/api_exception.dart';
+import '../http/json_body.dart';
 import '../http/json_response.dart';
 import '../middleware/auth_middleware.dart';
 import '../services/board_service.dart';
@@ -39,7 +39,7 @@ class BoardRoutes {
       return _invalidPath();
     }
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final task = await service.changeStatus(
         userId: user.id,
         taskId: taskId,
@@ -82,6 +82,14 @@ class BoardRoutes {
   /// Maps domain exceptions to the shared error envelope; rethrows anything
   /// unexpected so the global error middleware turns it into 500.
   Response _errorResponse(Object error) {
+    if (error is ApiException) {
+      return errorResponse(
+        error.statusCode,
+        error.code,
+        error.message,
+        details: error.details,
+      );
+    }
     if (error is ValidationException) {
       return errorResponse(
         400,
@@ -120,19 +128,6 @@ class BoardRoutes {
     'Некорректные данные запроса',
     details: const <String, Object?>{'field': 'id'},
   );
-
-  Future<Map<String, Object?>> _readBody(Request request) async {
-    Object? decoded;
-    try {
-      decoded = jsonDecode(await request.readAsString());
-    } on FormatException {
-      decoded = null;
-    }
-    if (decoded is! Map<String, dynamic>) {
-      throw const ValidationException(null);
-    }
-    return Map<String, Object?>.from(decoded);
-  }
 
   String _requiredString(Map<String, Object?> body, String field) {
     final value = body[field];

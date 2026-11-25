@@ -29,9 +29,9 @@ enum TaskPriority {
   low,
   medium,
   high,
-  urgent;
+  critical;
 
-  /// Значение в JSON/API.
+  /// Значение в JSON/API (/OpenAPI `task_priority`).
   String get wire => name;
 
   /// Имя для UI.
@@ -39,13 +39,13 @@ enum TaskPriority {
         TaskPriority.low => 'Низкий',
         TaskPriority.medium => 'Средний',
         TaskPriority.high => 'Высокий',
-        TaskPriority.urgent => 'Срочный',
+        TaskPriority.critical => 'Критический',
       };
 
   static TaskPriority fromWire(String? value) => switch (value) {
         'low' => TaskPriority.low,
         'high' => TaskPriority.high,
-        'urgent' => TaskPriority.urgent,
+        'critical' => TaskPriority.critical,
         _ => TaskPriority.medium,
       };
 }
@@ -162,7 +162,7 @@ class Task {
       priority: update.priority ?? priority,
       assigneeId: update.clearAssignee ? null : update.assigneeId ?? assigneeId,
       reporterId: reporterId,
-      parentId: update.parentId ?? parentId,
+      parentId: update.clearParentId ? null : update.parentId ?? parentId,
       dueDate: update.clearDueDate ? null : update.dueDate ?? dueDate,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -194,6 +194,7 @@ class TaskUpdate {
     this.parentId,
     this.clearAssignee = false,
     this.clearDueDate = false,
+    this.clearParentId = false,
   });
 
   final TaskKind? kind;
@@ -212,6 +213,9 @@ class TaskUpdate {
   /// Явно очищает `dueDate` (отправить `null`).
   final bool clearDueDate;
 
+  /// Явно очищает `parentId` (отправить `null`).
+  final bool clearParentId;
+
   Map<String, dynamic> toJson() => <String, dynamic>{
         if (kind != null) 'kind': kind!.wire,
         if (typeId != null) 'typeId': typeId,
@@ -227,6 +231,9 @@ class TaskUpdate {
           'dueDate': null
         else if (dueDate != null)
           'dueDate': dueDate!.toIso8601String(),
-        if (parentId != null) 'parentId': parentId,
+        if (clearParentId)
+          'parentId': null
+        else if (parentId != null)
+          'parentId': parentId,
       };
 }

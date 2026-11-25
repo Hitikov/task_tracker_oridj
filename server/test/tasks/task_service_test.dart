@@ -377,21 +377,17 @@ void main() {
       );
     });
 
-    test('empty typeId → 400 validation_error field=typeId', () async {
-      await expectLater(
-        service.createTask(
-          userId: ownerId,
-          projectId: projectId,
-          title: 'T',
-          kind: 'task',
-          typeId: '',
-          statusId: statusId,
-          priority: 'low',
-        ),
-        throwsA(
-          isA<ValidationException>().having((e) => e.field, 'field', 'typeId'),
-        ),
+    test('empty typeId uses the project default type', () async {
+      final task = await service.createTask(
+        userId: ownerId,
+        projectId: projectId,
+        title: 'T',
+        kind: 'task',
+        typeId: '',
+        statusId: statusId,
+        priority: 'low',
       );
+      expect(task.typeId, 'type-00000000-0000-4000-8000-000000000301');
     });
 
     test(
@@ -441,6 +437,17 @@ void main() {
         priority: 'low',
       );
       expect(task.statusId, 'status-00000000-0000-4000-8000-000000000400');
+    });
+
+    test('omitted typeId and priority use OpenAPI defaults', () async {
+      final task = await service.createTask(
+        userId: ownerId,
+        projectId: projectId,
+        title: 'T',
+        kind: 'task',
+      );
+      expect(task.typeId, 'type-00000000-0000-4000-8000-000000000301');
+      expect(task.priority, 'medium');
     });
 
     test('dueDate in the past → 400 validation_error field=dueDate', () async {
@@ -596,6 +603,66 @@ void main() {
         );
       },
     );
+
+    test('epic with children cannot become a task', () async {
+      final epic = await create(userId: ownerId, kind: 'epic');
+      await create(userId: ownerId, kind: 'task', parentId: epic.id);
+
+      await expectLater(
+        service.updateTask(
+          userId: ownerId,
+          taskId: epic.id,
+          fields: <String, Object?>{'kind': 'task'},
+        ),
+        throwsA(
+          isA<ValidationException>().having((e) => e.field, 'field', 'kind'),
+        ),
+      );
+    });
+
+    test('assignee must be a project member', () async {
+      await expectLater(
+        service.createTask(
+          userId: ownerId,
+          projectId: projectId,
+          title: 'Task',
+          kind: 'task',
+          typeId: typeId,
+          statusId: statusId,
+          priority: 'medium',
+          assigneeId: outsiderId,
+        ),
+        throwsA(
+          isA<ValidationException>().having(
+            (e) => e.field,
+            'field',
+            'assigneeId',
+          ),
+        ),
+      );
+    });
+
+    test('description longer than 5000 characters is rejected', () async {
+      await expectLater(
+        service.createTask(
+          userId: ownerId,
+          projectId: projectId,
+          title: 'Task',
+          kind: 'task',
+          typeId: typeId,
+          statusId: statusId,
+          priority: 'medium',
+          description: 'x' * 5001,
+        ),
+        throwsA(
+          isA<ValidationException>().having(
+            (e) => e.field,
+            'field',
+            'description',
+          ),
+        ),
+      );
+    });
 
     test('epic → with parent → 400 validation_error field=parentId', () async {
       final epic = await create(userId: ownerId, kind: 'epic');

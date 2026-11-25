@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
+import 'home_page.dart';
 import '../state/auth_providers.dart';
 
 /// Экран регистрации: реальный вызов `POST /api/v1/auth/register`
 /// через [AuthSession].
 ///
 /// После валидации формы регистрация вызывается сразу; по успеху показывается
-/// диалог «Вы зарегистрированы» — его кнопка «Перейти ко входу» возвращает
-/// email на экран входа.
+/// диалог «Вы зарегистрированы», а кнопка «Продолжить» открывает главный экран
+/// (сервер вернул JWT, поэтому сессия уже активна).
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 
@@ -126,18 +127,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           icon: const Icon(Icons.check_circle_outline, size: 48),
           title: const Text('Вы зарегистрированы'),
           content: Text(
-            'Аккаунт «${_emailController.text.trim()}» успешно создан.',
+            'Аккаунт «${_emailController.text.trim()}» успешно создан. '
+            'Вы уже вошли в систему.',
             textAlign: TextAlign.center,
           ),
           actions: [
             FilledButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop(); // закрыть диалог
-                Navigator.of(context).pop(
-                  _emailController.text.trim(), // вернуться на экран входа
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute<void>(
+                    builder: (_) => HomePage(
+                      login: _emailController.text.trim(),
+                    ),
+                  ),
                 );
               },
-              child: const Text('Перейти ко входу'),
+              child: const Text('Продолжить'),
             ),
           ],
         );

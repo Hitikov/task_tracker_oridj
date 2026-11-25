@@ -11,11 +11,14 @@ class AuthResponse {
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
+    final user = json['user'];
     return AuthResponse(
-      token: json['token'] as String,
-      tokenType: json['tokenType'] as String,
-      expiresIn: (json['expiresIn'] as num).toInt(),
-      user: User.fromJson(json['user'] as Map<String, dynamic>),
+      token: json['token']?.toString() ?? '',
+      tokenType: json['tokenType']?.toString() ?? 'Bearer',
+      expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 0,
+      user: User.fromJson(
+        user is Map<String, dynamic> ? user : const <String, dynamic>{},
+      ),
     );
   }
 

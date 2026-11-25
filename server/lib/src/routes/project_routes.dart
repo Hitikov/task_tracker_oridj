@@ -1,8 +1,8 @@
-import 'dart:convert';
-
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
+import '../http/api_exception.dart';
+import '../http/json_body.dart';
 import '../http/json_response.dart';
 import '../middleware/auth_middleware.dart';
 import '../repositories/project_repository.dart';
@@ -42,7 +42,7 @@ class ProjectRoutes {
       return _unauthorized();
     }
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final project = await service.createProject(
         userId: user.id,
         key: _requiredString(body, 'key'),
@@ -88,7 +88,7 @@ class ProjectRoutes {
       return _invalidPath();
     }
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final project = await service.updateProject(
         userId: user.id,
         projectId: projectId,
@@ -151,7 +151,7 @@ class ProjectRoutes {
       return _invalidPath();
     }
     try {
-      final body = await _readBody(request);
+      final body = await readJsonBody(request);
       final member = await service.addMember(
         userId: user.id,
         projectId: projectId,
@@ -193,6 +193,14 @@ class ProjectRoutes {
   /// shared error envelope; rethrows anything else (the global error
   /// middleware turns it into `500 internal_error`).
   Response _errorResponse(Object error) {
+    if (error is ApiException) {
+      return errorResponse(
+        error.statusCode,
+        error.code,
+        error.message,
+        details: error.details,
+      );
+    }
     if (error is ValidationException) {
       return errorResponse(
         400,
@@ -255,19 +263,6 @@ class ProjectRoutes {
     'Некорректные данные запроса',
     details: const <String, Object?>{'field': 'id'},
   );
-
-  Future<Map<String, Object?>> _readBody(Request request) async {
-    Object? decoded;
-    try {
-      decoded = jsonDecode(await request.readAsString());
-    } on FormatException {
-      decoded = null;
-    }
-    if (decoded is! Map<String, dynamic>) {
-      throw const ValidationException(null);
-    }
-    return Map<String, Object?>.from(decoded);
-  }
 
   String _requiredString(Map<String, Object?> body, String field) {
     final value = body[field];

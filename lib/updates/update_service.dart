@@ -126,9 +126,7 @@ class UpdateService {
   /// Сравнивает версии вида `2.0.1` / `2.0.1+3`.
   static bool isNewer(String candidate, String current) {
     List<int> parts(String value) => value
-        .split('+')
-        .first
-        .split(RegExp(r'[.\-]'))
+        .split(RegExp(r'[.\-+]'))
         .map(
           (p) => int.tryParse(p) ?? 0,
         )

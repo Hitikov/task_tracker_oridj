@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
+import '../api/api_error.dart';
 import '../auth/auth_repository.dart';
 import '../auth/token_store.dart';
 import '../models/user.dart';
@@ -12,7 +13,13 @@ final tokenStoreProvider = Provider<TokenStore>(
 
 /// Dio-клиент; токен читается из [tokenStoreProvider].
 final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient(getToken: () => ref.read(tokenStoreProvider).read());
+  return ApiClient(
+    getToken: () => ref.read(tokenStoreProvider).read(),
+    onUnauthorized: () async {
+      await ref.read(tokenStoreProvider).delete();
+      ref.invalidate(authSessionProvider);
+    },
+  );
 });
 
 /// Репозиторий аутентификации и проектов.
@@ -29,7 +36,15 @@ class AuthSession extends AsyncNotifier<User?> {
   @override
   Future<User?> build() async {
     final repository = ref.read(authRepositoryProvider);
-    return repository.currentUser();
+    try {
+      return await repository.currentUser();
+    } on ApiException catch (error) {
+      if (error.isUnauthorized) {
+        await repository.logout();
+        return null;
+      }
+      rethrow;
+    }
   }
 
   /// Текущий пользователь из состояния (null, пока сессия не активна).
@@ -69,10 +84,9 @@ class AuthSession extends AsyncNotifier<User?> {
         password: password,
         name: name,
       );
-      // После регистрации пользователь остаётся на экране входа: экран входа
-      // покажет диалог «Вы зарегистрированы», а кнопка «Перейти ко входу»
-      // вернёт email на экран входа (см. [RegisterPage]).
-      state = const AsyncValue<User?>.data(null);
+      // Сервер уже выдал JWT, и репозиторий его сохранил: сессия активна
+      // сразу после регистрации, повторный вход не требуется.
+      state = AsyncValue<User?>.data(response.user);
       return response.user;
     } on Exception catch (e, stackTrace) {
       state = AsyncValue<User?>.error(e, stackTrace);

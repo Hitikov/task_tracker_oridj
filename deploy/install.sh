@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Arij — установка и запуск на Debian/Ubuntu одной командой.
-#   curl -fsSL <raw-install.sh> | sudo bash -s -- <домен или IP>
+# Arij — установка и запуск на Debian/Ubuntu.
+#   curl -fsSLo install.sh https://raw.githubusercontent.com/Hitikov/task_tracker_oridj/main/deploy/install.sh
+#   echo '<SHA256>  install.sh' | sha256sum -c - && sudo bash install.sh <домен или IP>
 set -euo pipefail
 
 TARGET="${1:-}"
 if [[ -z "$TARGET" ]]; then
   echo "Использование: $0 <домен или IP>" >&2
+  exit 1
+fi
+if [[ ! "$TARGET" =~ ^([A-Za-z0-9.-]+|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+  echo "Некорректный домен или IP: $TARGET" >&2
   exit 1
 fi
 
@@ -47,13 +52,14 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 systemctl enable --now docker
 
 echo "==> Получение исходников Arij"
+BRANCH="${BRANCH:-main}"
 if [[ ! -d task_tracker_oridj/.git ]]; then
-  git clone --depth 1 -b feature/stage-4-mvp-polish \
+  git clone --depth 1 -b "$BRANCH" \
     https://github.com/Hitikov/task_tracker_oridj.git
 fi
 cd task_tracker_oridj
-git fetch origin feature/stage-4-mvp-polish
-git reset --hard origin/feature/stage-4-mvp-polish
+git fetch --depth 1 origin "$BRANCH"
+git pull --ff-only origin "$BRANCH"
 
 echo "==> Запуск прод-контура (postgres + server + caddy)"
 bash deploy/deploy.sh "$TARGET"

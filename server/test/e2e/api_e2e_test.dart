@@ -6,7 +6,7 @@ import 'package:arij_server/src/db/database.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
-import '../db/ensure_migrations.dart';
+import '../db/ensure_migrations.dart' show databaseSkipReason, ensureMigrations;
 
 /// E2E-тесты на живом PostgreSQL через реальный HTTP-хендлер приложения.
 ///
@@ -45,9 +45,7 @@ Future<bool> _databaseAvailable(Map<String, String> environment) async {
 void main() async {
   final environment = _environment();
   final available = await _databaseAvailable(environment);
-  final skipReason = available
-      ? null
-      : 'База недоступна: запустите PostgreSQL и задайте env DB_* / JWT_SECRET';
+  final skipReason = databaseSkipReason(available);
 
   // Суффикс делает email и ключи проекта уникальными между прогонами, чтобы
   // тесты можно было запускать повторно на одной и той же БД без ручной чистки.

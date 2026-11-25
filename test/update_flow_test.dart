@@ -42,7 +42,8 @@ class _FakeDownloader extends UpdateDownloader {
     if (error != null) throw error!;
     onProgress?.call(1, 1);
     return File(
-        '${Directory.systemTemp.path}${Platform.pathSeparator}update-test.exe');
+      '${Directory.systemTemp.path}${Platform.pathSeparator}update-test.exe',
+    );
   }
 }
 
@@ -108,14 +109,15 @@ void main() {
         ..httpClientAdapter = _SumsAdapter('${'0' * 64}  app.apk');
 
       await UpdateDownloader(dio: goodDio).verifyChecksum(
-          file,
-          const UpdateInfo(
-            version: '2.1.0',
-            tag: 'v2.1.0',
-            releaseUrl: 'https://example.com',
-            assetName: 'app.apk',
-            checksumUrl: 'https://example.com/SHA256SUMS.txt',
-          ));
+        file,
+        const UpdateInfo(
+          version: '2.1.0',
+          tag: 'v2.1.0',
+          releaseUrl: 'https://example.com',
+          assetName: 'app.apk',
+          checksumUrl: 'https://example.com/SHA256SUMS.txt',
+        ),
+      );
 
       await expectLater(
         UpdateDownloader(dio: badDio).verifyChecksum(
@@ -131,6 +133,41 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('verifyChecksum fails closed without a checksum entry', () async {
+      final file = File(
+        '${Directory.systemTemp.path}${Platform.pathSeparator}arij-checksum-test.bin',
+      );
+      await file.writeAsString('payload');
+      addTearDown(() async {
+        if (file.existsSync()) await file.delete();
+      });
+
+      const info = UpdateInfo(
+        version: '2.1.0',
+        tag: 'v2.1.0',
+        releaseUrl: 'https://example.com',
+        assetName: 'app.apk',
+        checksumUrl: 'https://example.com/SHA256SUMS.txt',
+      );
+      final emptySums = Dio()..httpClientAdapter = const _SumsAdapter('');
+      await expectLater(
+        UpdateDownloader(dio: emptySums).verifyChecksum(file, info),
+        throwsStateError,
+      );
+      await expectLater(
+        UpdateDownloader(dio: Dio()).verifyChecksum(
+          file,
+          const UpdateInfo(
+            version: '2.1.0',
+            tag: 'v2.1.0',
+            releaseUrl: 'https://example.com',
+            assetName: 'app.apk',
+          ),
+        ),
+        throwsStateError,
+      );
+    });
   });
 
   group('UpdateController', () {
@@ -141,23 +178,32 @@ void main() {
     }) {
       return ProviderContainer(
         overrides: [
-          updateServiceProvider
-              .overrideWithValue(_FakeUpdateService(result: result)),
-          updateDownloaderProvider
-              .overrideWithValue(_FakeDownloader(error: downloadError)),
+          updateServiceProvider.overrideWithValue(
+            _FakeUpdateService(result: result),
+          ),
+          updateDownloaderProvider.overrideWithValue(
+            _FakeDownloader(error: downloadError),
+          ),
           updateInstallerProvider.overrideWithValue(installer),
         ],
       );
     }
 
-    test('downloads and installs an update automatically', () async {
+    test('downloads an update but installs only after consent', () async {
       final installer = _FakeInstaller();
       final container = makeContainer(installer: installer);
       addTearDown(container.dispose);
 
-      await container.read(updateControllerProvider.notifier).checkAndInstall();
+      final notifier = container.read(updateControllerProvider.notifier);
+      await notifier.checkForUpdate();
 
-      final state = container.read(updateControllerProvider);
+      var state = container.read(updateControllerProvider);
+      expect(state.phase, UpdatePhase.ready);
+      expect(installer.calls, 0);
+
+      await notifier.installPrepared();
+
+      state = container.read(updateControllerProvider);
       expect(state.phase, UpdatePhase.idle);
       expect(installer.calls, 1);
       expect(installer.installedPath, contains('update-test.exe'));

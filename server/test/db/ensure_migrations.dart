@@ -1,5 +1,17 @@
+import 'dart:io';
+
 import 'package:arij_server/src/db/database.dart';
 import 'package:arij_server/src/db/migration_runner.dart';
+
+/// Возвращает причину пропуска БД-тестов или падает, если CI объявил БД
+/// обязательной через `REQUIRE_DB=true`.
+String? databaseSkipReason(bool available) {
+  if (available) return null;
+  if (Platform.environment['REQUIRE_DB'] == 'true') {
+    throw StateError('База данных недоступна, хотя REQUIRE_DB=true');
+  }
+  return 'База недоступна: запустите PostgreSQL и задайте env DB_* / JWT_SECRET';
+}
 
 /// Приводит [database] к актуальной схеме идемпотентно.
 ///

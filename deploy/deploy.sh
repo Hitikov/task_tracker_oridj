@@ -15,6 +15,10 @@ if [[ -z "$TARGET" ]]; then
   echo "Использование: $0 <домен или IP>" >&2
   exit 1
 fi
+if [[ ! "$TARGET" =~ ^([A-Za-z0-9.-]+|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+  echo "Некорректный домен или IP: $TARGET" >&2
+  exit 1
+fi
 
 # IP-адрес не может получить сертификат Let's Encrypt — работаем по HTTP.
 if [[ "$TARGET" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -78,3 +82,9 @@ echo "Готово:"
 echo "  API:   $API_BASE/health"
 echo "  Web:   $API_BASE/  (если собран deploy/www)"
 echo "  Логи:  $DK compose ${COMPOSE_ARGS[*]} logs -f"
+if [[ "$SCHEME" == "http" ]]; then
+  echo "" >&2
+  echo "ВНИМАНИЕ: развёртывание по IP работает по HTTP. Официальные релизы" >&2
+  echo "требуют HTTPS и к такому серверу подключиться не смогут. Для прод-релиза" >&2
+  echo "используйте домен с Let's Encrypt." >&2
+fi
