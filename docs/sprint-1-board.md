@@ -6,6 +6,8 @@
 Источники: [ROADMAP](ROADMAP.md), [MVP](MVP.md),
 [USER_STORY_FOR_REPORT](USER_STORY_FOR_REPORT.md).
 
+![Доска первого спринта](sprint-1-board.png)
+
 ## Колонки
 
 | Колонка | Смысл | Правило перехода |
