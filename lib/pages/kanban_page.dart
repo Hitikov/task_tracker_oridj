@@ -8,6 +8,7 @@ import '../models/project_member.dart';
 import '../models/task.dart';
 import '../state/tasks_providers.dart';
 import 'backlog_page.dart';
+import 'task_history_page.dart';
 
 /// Kanban-доска проекта: колонки по статусам и перенос задач drag & drop.
 class KanbanPage extends ConsumerWidget {
@@ -147,6 +148,16 @@ class _BoardView extends ConsumerWidget {
                         taskId,
                         column.status.id,
                       ),
+                      onOpenHistory: (task) => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => TaskHistoryPage(
+                            taskId: task.id,
+                            projectId: project.id,
+                            taskKey: task.key,
+                            taskTitle: task.title,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -163,11 +174,13 @@ class _StatusColumn extends StatelessWidget {
     required this.column,
     required this.memberById,
     required this.onAcceptTask,
+    required this.onOpenHistory,
   });
 
   final BoardColumn column;
   final Map<String, ProjectMember> memberById;
   final Future<void> Function(String taskId) onAcceptTask;
+  final void Function(Task task) onOpenHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +253,7 @@ class _StatusColumn extends StatelessWidget {
                               task: task,
                               assigneeName:
                                   _assigneeName(task.assigneeId, memberById),
+                              onHistory: () => onOpenHistory(task),
                             ),
                           );
                         },
@@ -254,10 +268,15 @@ class _StatusColumn extends StatelessWidget {
 }
 
 class _TaskCard extends StatelessWidget {
-  const _TaskCard({required this.task, required this.assigneeName});
+  const _TaskCard({
+    required this.task,
+    required this.assigneeName,
+    required this.onHistory,
+  });
 
   final Task task;
   final String assigneeName;
+  final VoidCallback onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -269,12 +288,29 @@ class _TaskCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              task.key,
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    task.key,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'История',
+                  onPressed: onHistory,
+                  icon: const Icon(Icons.history, size: 18),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(

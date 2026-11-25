@@ -1,6 +1,7 @@
 import 'package:arij_server/src/models/project.dart';
 import 'package:arij_server/src/models/status.dart';
 import 'package:arij_server/src/models/task.dart';
+import 'package:arij_server/src/models/task_status_change.dart';
 import 'package:arij_server/src/repositories/board_repository.dart';
 
 /// In-memory [BoardRepository] for Kanban service and route tests.
@@ -171,4 +172,17 @@ class FakeBoardRepository implements BoardRepository {
     _tasks[taskId] = updated;
     return updated;
   }
+
+  @override
+  Future<void> recordStatusChange({
+    required String taskId,
+    required String projectId,
+    required String fromStatusId,
+    required String toStatusId,
+    required String changedBy,
+  }) async {}
+
+  @override
+  Future<List<TaskStatusChange>> findStatusHistory(String taskId) async =>
+      const <TaskStatusChange>[];
 }

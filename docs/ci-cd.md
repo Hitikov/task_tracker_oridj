@@ -2,20 +2,22 @@
 
 В репозитории два workflow GitHub Actions. Пайплайн построен по схеме
 **lint → test → build → deploy**: сначала проверки, затем тесты, затем параллельная
-сборка под Android и Windows, и только после этого публикация.
+сборка под Android, Windows и Web, и только после этого публикация.
 
 | Workflow | Файл | Когда запускается | Этапы |
 |---|---|---|---|
-| **CI** | `.github/workflows/ci.yml` | Pull request в любую ветку, push в `main`, вручную | lint → test → build-android + build-windows |
-| **Release** | `.github/workflows/release.yml` | Push тега `v*`, вручную | lint → test → build-android + build-windows → deploy |
+| **CI** | `.github/workflows/ci.yml` | Pull request в любую ветку, push в `main`, вручную | lint → test → build-android + build-windows + build-web |
+| **Release** | `.github/workflows/release.yml` | Push тега `v*`, вручную | lint → test → build-android + build-windows + build-web → deploy |
 
 ```mermaid
 flowchart LR
   L[lint] --> T[test]
   T --> A[build-android<br/>APK + AAB]
-  T --> W[build-windows<br/>x64 zip]
+  T --> W[build-windows<br/>x64 zip + exe]
+  T --> B[build-web<br/>web zip]
   A --> D[deploy<br/>GitHub Release]
   W --> D
+  B --> D
 ```
 
 В CI этап `deploy` не выполняется: pull request и обычный push в `main` только
@@ -58,7 +60,7 @@ E2E-сценарий MVP и граничные случаи API описаны �
 
 ### 3. Build
 
-Обе сборки запускаются параллельно после успешного `test`.
+Все три сборки запускаются параллельно после успешного `test`.
 
 **Android** (`build-android`, `ubuntu-latest`, Temurin Java 17):
 
@@ -76,16 +78,36 @@ E2E-сценарий MVP и граничные случаи API описаны �
   `ArijSetup-<version>-x64.exe` с ярлыком на рабочий стол;
 - рядом кладётся `SHA256SUMS.txt`.
 
+**Web** (`build-web`, `ubuntu-latest`):
+
+- `flutter build web --release` с `--dart-define=API_BASE_URL`;
+- в CI значением по умолчанию служит `http://localhost:8080`, если переменная
+  `API_BASE_URL` не задана; в Release переменная обязательна и проходит ту же
+  проверку (`https://<домен>` или `http://<IP>`), что и остальные сборки;
+- smoke-проверка: `build/web/index.html` должен существовать, быть непустым и
+  содержать HTML-разметку, вместе с загрузчиком Flutter;
+- в CI готовый `build/web/` загружается artifact'ом `web-release`;
+- в Release директория упаковывается в `task_tracker_oridj-<version>-web.zip`
+  и загружается artifact'ом `web-release`.
+
 Версия берётся из `pubspec.yaml`, номер сборки (`+N`) используется как
 Android `versionCode`. Для каждого релиза увеличивайте и версию, и build number.
 
 ### 4. Deploy
 
 Job `deploy` есть только в Release workflow. Он запускается после успешной
-сборки обеих платформ, скачивает артефакты, формирует общий `SHA256SUMS.txt`
-и создаёт GitHub Release с APK, AAB, Windows-архивом и установщиком `.exe`.
+сборки всех трёх платформ, скачивает артефакты Android, Windows и Web, формирует
+общий `SHA256SUMS.txt` и создаёт GitHub Release с APK, AAB, Windows-архивом,
+установщиком `.exe` и Web-архивом `.zip`.
 Текущие релизы: `v2.0.0` … `v2.0.4`; готовится `v2.0.5` с исправлениями аудита.
 Release требует заданного `API_BASE_URL` (`https://<домен>` или `http://<IP>`) и секретов `ANDROID_KEYSTORE_*`. Для IP-адреса включён HTTP с предупреждением: JWT передаётся без TLS.
+
+Smoke-проверки прерывают сборку, если отсутствует или пуст любой ожидаемый
+артефакт (APK, AAB, Windows `zip`, установщик `.exe`, Web `zip`), если Web-архив не
+содержит `index.html`, либо если `SHA256SUMS.txt` не покрывает какой-то из
+файлов. Дополнительно выполняется `sha256sum -c SHA256SUMS.txt`. Аналогичные
+проверки есть в самих job'ах сборки (APK/AAB, zip/exe, `build/web/index.html`),
+чтобы ошибка была видна до публикации.
 
 Deploy требует `contents: write`; остальные job'ы работают с `contents: read`.
 
@@ -161,6 +183,7 @@ flutter test
 flutter build apk --release
 flutter build appbundle --release
 flutter build windows --release
+flutter build web --release --dart-define=API_BASE_URL=http://localhost:8080
 ```
 
 ## Как выпустить релиз
@@ -190,6 +213,7 @@ flutter build windows --release
    - `task_tracker_oridj-2.0.4-android.aab`;
    - `task_tracker_oridj-2.0.4-windows-x64.zip`;
    - `ArijSetup-2.0.4-x64.exe`;
+   - `task_tracker_oridj-2.0.4-web.zip`;
    - `SHA256SUMS.txt`.
 
 Тег должен указывать на коммит, в котором уже есть актуальный
@@ -203,15 +227,18 @@ flutter build windows --release
 
 ## Где скачать сборку
 
-- **CI**: вкладка **Actions → нужный запуск → Artifacts**. Android и Windows
-  лежат отдельными artifact'ами, срок хранения — 14 дней.
-- **Release**: раздел **Releases** репозитория, файлы хранятся бессрочно.
+- **CI**: вкладка **Actions → нужный запуск → Artifacts**. Android, Windows и Web
+  лежат отдельными artifact'ами (`android-release`, `windows-release`,
+  `web-release`), срок хранения — 14 дней. Web-артефакт содержит содержимое
+  `build/web/`, включая `index.html`.
+- **Release**: раздел **Releases** репозитория, файлы хранятся бессрочно;
+  Web-сборка публикуется как `task_tracker_oridj-<version>-web.zip`.
 
 ## Ограничения
 
-- Web-сборки нет: job `build-web` в workflow отсутствует. Базовый URL задаётся
-  build-time константой `--dart-define=API_BASE_URL`, поэтому для Web потребуется
-  отдельная сборка или конфигурация на стороне прокси.
+- Web-сборка статическая: базовый URL задаётся build-time константой
+  `--dart-define=API_BASE_URL`, поэтому смена адреса API требует пересборки или
+  конфигурации на стороне reverse proxy.
 - Прод-развёртывание использует Caddy (`deploy/`), а не Nginx, описанный в
   [архитектуре](architecture.md) как reverse proxy для Flutter Web.
 - `API_BASE_URL` нужно передавать при сборке; приложение не переключает сервер
@@ -224,6 +251,9 @@ flutter build windows --release
   организации включён режим «Read repository contents permission» по умолчанию,
   явные `permissions` в workflow всё равно выдают токену нужный доступ.
 - Android-сборка не требует секретов: без них используется debug-подпись.
+- Variable `API_BASE_URL` задаётся в **Settings → Secrets and variables →
+  Actions → Variables**. В CI она необязательна (fallback
+  `http://localhost:8080`), в Release обязательна и проверяется форматом.
 - `.env` с параметрами PostgreSQL в релизный архив не попадает.
 
 ## Self-hosted runner
@@ -242,6 +272,7 @@ runs-on: [self-hosted, "runner-${{ github.actor }}"]
 - для Windows-сборки runner должен быть Windows-машиной с Visual Studio
   Build Tools (Desktop development with C++);
 - для Android-сборки нужны Android SDK, Java 17 и принятые лицензии SDK;
+- для Web-сборки и smoke-проверок на Linux-раннере нужны `zip` и `unzip`;
 - в workflow есть шаги `shell: pwsh` — на self-hosted Windows должен быть
   установлен PowerShell 7 либо эти шаги нужно заменить на `shell: powershell`;
 - self-hosted runner в публичном репозитории не рекомендуется: код из pull

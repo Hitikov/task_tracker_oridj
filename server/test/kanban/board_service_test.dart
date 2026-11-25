@@ -1,9 +1,43 @@
+import 'package:arij_server/src/models/task_status_change.dart';
 import 'package:arij_server/src/services/board_service.dart';
 import 'package:arij_server/src/services/project_service.dart'
     show ForbiddenException, NotFoundException, ValidationException;
 import 'package:test/test.dart';
 
 import 'fake_board_repository.dart';
+
+/// [FakeBoardRepository] that keeps status changes in memory, like the SQL
+/// table used by the production repository.
+class RecordingBoardRepository extends FakeBoardRepository {
+  final List<TaskStatusChange> _history = <TaskStatusChange>[];
+  int _nextId = 1;
+
+  @override
+  Future<void> recordStatusChange({
+    required String taskId,
+    required String projectId,
+    required String fromStatusId,
+    required String toStatusId,
+    required String changedBy,
+  }) async {
+    _history.add(
+      TaskStatusChange(
+        id: 'change-${_nextId++}',
+        taskId: taskId,
+        fromStatusId: fromStatusId,
+        toStatusId: toStatusId,
+        changedBy: changedBy,
+        changedAt: DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  @override
+  Future<List<TaskStatusChange>> findStatusHistory(String taskId) async =>
+      List<TaskStatusChange>.unmodifiable(
+        _history.where((change) => change.taskId == taskId),
+      );
+}
 
 void main() {
   const projectId = 'proj-1';
@@ -20,7 +54,7 @@ void main() {
   late BoardService service;
 
   setUp(() {
-    repository = FakeBoardRepository()
+    repository = RecordingBoardRepository()
       ..seedProject(
         id: projectId,
         key: 'PROJ',
@@ -297,6 +331,141 @@ void main() {
             'project_not_found',
           ),
         ),
+      );
+    });
+  });
+
+  group('BoardService.getStatusHistory', () {
+    test('records every successful move in chronological order', () async {
+      final taskId = await addTask(id: 'task-1', number: 1, statusId: todoId);
+      await service.changeStatus(
+        userId: ownerId,
+        taskId: taskId,
+        statusId: progressId,
+      );
+      await service.changeStatus(
+        userId: memberId,
+        taskId: taskId,
+        statusId: doneId,
+      );
+
+      final history = await service.getStatusHistory(
+        userId: ownerId,
+        taskId: taskId,
+      );
+      expect(history, hasLength(2));
+      expect(history.map((change) => change.fromStatusId), <String>[
+        todoId,
+        progressId,
+      ]);
+      expect(history.map((change) => change.toStatusId), <String>[
+        progressId,
+        doneId,
+      ]);
+      expect(history.map((change) => change.changedBy), <String>[
+        ownerId,
+        memberId,
+      ]);
+      expect(history.every((change) => change.taskId == taskId), isTrue);
+      expect(
+        history.first.toJson().keys,
+        unorderedEquals(<String>[
+          'id',
+          'taskId',
+          'fromStatusId',
+          'toStatusId',
+          'changedBy',
+          'changedAt',
+        ]),
+      );
+    });
+
+    test('re-applying the current status is recorded too', () async {
+      final taskId = await addTask(id: 'task-1', number: 1, statusId: todoId);
+      await service.changeStatus(
+        userId: ownerId,
+        taskId: taskId,
+        statusId: todoId,
+      );
+      final history = await service.getStatusHistory(
+        userId: ownerId,
+        taskId: taskId,
+      );
+      expect(history, hasLength(1));
+      expect(history.single.fromStatusId, todoId);
+      expect(history.single.toStatusId, todoId);
+    });
+
+    test('failed changes leave no history', () async {
+      final taskId = await addTask(id: 'task-1', number: 1, statusId: todoId);
+      expect(
+        () => service.changeStatus(
+          userId: outsiderId,
+          taskId: taskId,
+          statusId: doneId,
+        ),
+        throwsA(isA<ForbiddenException>()),
+      );
+      expect(
+        () => service.changeStatus(
+          userId: ownerId,
+          taskId: taskId,
+          statusId: otherStatusId,
+        ),
+        throwsA(isA<ValidationException>()),
+      );
+      final history = await service.getStatusHistory(
+        userId: ownerId,
+        taskId: taskId,
+      );
+      expect(history, isEmpty);
+    });
+
+    test('history of another task is not mixed in', () async {
+      final first = await addTask(id: 'task-1', number: 1, statusId: todoId);
+      final second = await addTask(id: 'task-2', number: 2, statusId: todoId);
+      await service.changeStatus(
+        userId: ownerId,
+        taskId: first,
+        statusId: doneId,
+      );
+      expect(
+        await service.getStatusHistory(userId: ownerId, taskId: second),
+        isEmpty,
+      );
+    });
+
+    test('member may read history', () async {
+      final taskId = await addTask(id: 'task-1', number: 1, statusId: todoId);
+      await service.changeStatus(
+        userId: ownerId,
+        taskId: taskId,
+        statusId: doneId,
+      );
+      expect(
+        await service.getStatusHistory(userId: memberId, taskId: taskId),
+        hasLength(1),
+      );
+    });
+
+    test('unknown task → task_not_found', () async {
+      expect(
+        () => service.getStatusHistory(userId: ownerId, taskId: 'missing-task'),
+        throwsA(
+          isA<NotFoundException>().having(
+            (error) => error.code,
+            'code',
+            'task_not_found',
+          ),
+        ),
+      );
+    });
+
+    test('non-member → forbidden', () async {
+      final taskId = await addTask(id: 'task-1', number: 1, statusId: todoId);
+      expect(
+        () => service.getStatusHistory(userId: outsiderId, taskId: taskId),
+        throwsA(isA<ForbiddenException>()),
       );
     });
   });

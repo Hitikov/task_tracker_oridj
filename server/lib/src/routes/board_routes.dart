@@ -13,6 +13,7 @@ import '../services/project_service.dart'
 ///
 /// Routes (wired in `app.dart` by the stage owner):
 /// - `PATCH /api/v1/tasks/<id>/status`
+/// - `GET /api/v1/tasks/<id>/history`
 /// - `GET /api/v1/projects/<id>/board`
 ///
 /// Path parameters are read via `request.params` (shelf_router stores them
@@ -46,6 +47,31 @@ class BoardRoutes {
         statusId: _requiredString(body, 'statusId'),
       );
       return jsonResponse(task.toJson());
+    } on Object catch (error) {
+      return _errorResponse(error);
+    }
+  }
+
+  /// `GET /api/v1/tasks/<id>/history` — `200` array of status changes.
+  ///
+  /// Each item is `{ "id", "taskId", "fromStatusId", "toStatusId",
+  /// "changedBy", "changedAt" }`. `404 task_not_found` for an unknown id,
+  /// `403 forbidden` for a non-member of the task's project.
+  Future<Response> getStatusHistory(Request request) async {
+    final user = authenticatedUser(request);
+    if (user == null) {
+      return _unauthorized();
+    }
+    final taskId = _pathParam(request, 'id');
+    if (taskId == null) {
+      return _invalidPath();
+    }
+    try {
+      final history = await service.getStatusHistory(
+        userId: user.id,
+        taskId: taskId,
+      );
+      return jsonResponse(history.map((change) => change.toJson()).toList());
     } on Object catch (error) {
       return _errorResponse(error);
     }

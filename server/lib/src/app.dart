@@ -66,7 +66,9 @@ Handler buildHandler({
   late final TaskService taskService = TaskService(repository: taskRepository);
   late final TaskRoutes taskRoutes = TaskRoutes(taskService);
   late final BoardRoutes boardRoutes = BoardRoutes(
-    BoardService(repository: TaskBackedBoardRepository(taskRepository)),
+    BoardService(
+      repository: TaskBackedBoardRepository(taskRepository, database),
+    ),
   );
   late final Middleware projectAuth = authMiddleware(
     jwtSecret: jwtSecret ?? resolvedConfig.jwtSecret,
@@ -161,6 +163,11 @@ Handler buildHandler({
         ..patch(
           '/api/v1/tasks/<id>/status',
           (Request request) => projectAuth(boardRoutes.changeStatus)(request),
+        )
+        ..get(
+          '/api/v1/tasks/<id>/history',
+          (Request request) =>
+              projectAuth(boardRoutes.getStatusHistory)(request),
         )
         ..get(
           '/api/v1/projects/<id>/board',

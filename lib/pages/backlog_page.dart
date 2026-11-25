@@ -11,6 +11,7 @@ import '../models/task_filters.dart';
 import '../models/task_type.dart';
 import '../state/tasks_providers.dart';
 import 'kanban_page.dart';
+import 'task_history_page.dart';
 
 /// Экран Backlog проекта: список задач с фильтрами, сортировкой,
 /// созданием, редактированием и удалением.
@@ -116,6 +117,7 @@ class _BacklogPageState extends ConsumerState<BacklogPage> {
           statusName: statusById[task.statusId]?.name ?? task.statusId,
           assigneeName: _assigneeName(task.assigneeId, memberById),
           onEdit: () => _openTaskForm(task: task),
+          onHistory: () => _openHistory(task),
           onDelete: () => _confirmDelete(task),
         );
       },
@@ -128,6 +130,19 @@ class _BacklogPageState extends ConsumerState<BacklogPage> {
   ) {
     if (assigneeId == null) return '—';
     return memberById[assigneeId]?.name ?? assigneeId;
+  }
+
+  void _openHistory(Task task) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TaskHistoryPage(
+          taskId: task.id,
+          projectId: widget.project.id,
+          taskKey: task.key,
+          taskTitle: task.title,
+        ),
+      ),
+    );
   }
 
   Future<void> _openTaskForm({Task? task}) async {
@@ -405,6 +420,7 @@ class _TaskTile extends StatelessWidget {
     required this.statusName,
     required this.assigneeName,
     required this.onEdit,
+    required this.onHistory,
     required this.onDelete,
   });
 
@@ -412,6 +428,7 @@ class _TaskTile extends StatelessWidget {
   final String statusName;
   final String assigneeName;
   final VoidCallback onEdit;
+  final VoidCallback onHistory;
   final VoidCallback onDelete;
 
   @override
@@ -485,6 +502,11 @@ class _TaskTile extends StatelessWidget {
                 tooltip: 'Редактировать',
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                tooltip: 'История',
+                onPressed: onHistory,
+                icon: const Icon(Icons.history),
               ),
               IconButton(
                 tooltip: 'Удалить',

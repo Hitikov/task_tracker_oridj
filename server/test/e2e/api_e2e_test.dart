@@ -714,5 +714,91 @@ void main() async {
       expect(delete.statusCode, 404);
       expect(errorOf(await json(delete))['code'], 'task_not_found');
     });
+
+    e2eTest(
+      'история смены статуса пишется в БД и читается через API',
+      () async {
+        final created = await send(
+          'POST',
+          '/api/v1/projects/${projectId()}/tasks',
+          token: ownerToken,
+          body: taskBody(
+            title: 'Status history',
+            kind: 'epic',
+            typeId: featureId(),
+            statusId: todoId(),
+          ),
+        );
+        expect(created.statusCode, 201);
+        final taskId = (await json(created))['id'] as String;
+        final inProgressId = statusId(statuses, 'In Progress');
+        final doneId = statusId(statuses, 'Done');
+
+        for (final nextStatus in <String>[inProgressId, doneId]) {
+          final moved = await send(
+            'PATCH',
+            '/api/v1/tasks/$taskId/status',
+            token: ownerToken,
+            body: <String, Object?>{'statusId': nextStatus},
+          );
+          expect(moved.statusCode, 200);
+        }
+
+        final response = await send(
+          'GET',
+          '/api/v1/tasks/$taskId/history',
+          token: ownerToken,
+        );
+        expect(response.statusCode, 200);
+        final body = await jsonList(response);
+        expect(body, hasLength(2));
+        final changes = body.cast<Map<String, dynamic>>();
+        expect(
+          changes.first.keys,
+          unorderedEquals(<String>[
+            'id',
+            'taskId',
+            'fromStatusId',
+            'toStatusId',
+            'changedBy',
+            'changedAt',
+          ]),
+        );
+        expect(changes.first['taskId'], taskId);
+        expect(changes.first['fromStatusId'], todoId());
+        expect(changes.first['toStatusId'], inProgressId);
+        expect(changes.last['fromStatusId'], inProgressId);
+        expect(changes.last['toStatusId'], doneId);
+        expect(changes.first['changedBy'], isA<String>());
+        expect(
+          DateTime.parse(changes.first['changedAt'] as String),
+          isA<DateTime>(),
+        );
+
+        final forbidden = await send(
+          'GET',
+          '/api/v1/tasks/$taskId/history',
+          token: outsiderToken,
+        );
+        expect(forbidden.statusCode, 403);
+        expect(errorOf(await json(forbidden))['code'], 'forbidden');
+
+        const unknownTaskId = '00000000-0000-4000-8000-0000000000fd';
+        final missing = await send(
+          'GET',
+          '/api/v1/tasks/$unknownTaskId/history',
+          token: ownerToken,
+        );
+        expect(missing.statusCode, 404);
+        expect(errorOf(await json(missing))['code'], 'task_not_found');
+
+        final deleted = await send(
+          'DELETE',
+          '/api/v1/tasks/$taskId',
+          token: ownerToken,
+        );
+        expect(deleted.statusCode, 204);
+      },
+    );
   });
 }

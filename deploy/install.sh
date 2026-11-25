@@ -58,8 +58,8 @@ if [[ ! -d task_tracker_oridj/.git ]]; then
     https://github.com/Hitikov/task_tracker_oridj.git
 fi
 cd task_tracker_oridj
-git fetch --depth 1 origin "$BRANCH"
-git pull --ff-only origin "$BRANCH"
+git fetch --depth 1 origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+git checkout -B "$BRANCH" "origin/$BRANCH"
 
 echo "==> Запуск прод-контура (postgres + server + caddy)"
 bash deploy/deploy.sh "$TARGET"

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/person_controller.dart';
+import '../models/project.dart';
 import '../state/auth_providers.dart';
+import '../state/members_providers.dart';
 import '../updates/update_controller.dart';
 import '../updates/update_dialog.dart';
 import '../widgets/app_sidebar.dart';
@@ -13,6 +15,7 @@ import '../widgets/roadmap_view.dart';
 import '../widgets/section_placeholder.dart';
 import 'home_section.dart';
 import 'login_page.dart';
+import 'project_members_page.dart';
 import 'projects_page.dart';
 
 /// Основная оболочка приложения: боковое меню и область контента.
@@ -234,6 +237,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildContent() {
+    final selectedProject = ref.watch(selectedProjectProvider);
+
     return switch (_selectedSection) {
       HomeSection.dashboard => SectionPlaceholder(
           icon: Icons.space_dashboard_outlined,
@@ -268,7 +273,27 @@ class _HomePageState extends ConsumerState<HomePage> {
           ],
         ),
       HomeSection.projects => const ProjectsPage(),
+      HomeSection.members => _buildMembersSection(selectedProject),
       HomeSection.roadmap => const RoadmapView(),
     };
+  }
+
+  Widget _buildMembersSection(Project? project) {
+    if (project == null) {
+      return SectionPlaceholder(
+        icon: Icons.group_outlined,
+        title: 'Участники проекта',
+        description: 'Сначала создайте проект — затем добавьте в него '
+            'участников и назначайте роли.',
+        actions: [
+          FilledButton.icon(
+            onPressed: () => _selectSection(HomeSection.projects),
+            icon: const Icon(Icons.folder_outlined),
+            label: const Text('Перейти к проектам'),
+          ),
+        ],
+      );
+    }
+    return ProjectMembersPage(project: project);
   }
 }
