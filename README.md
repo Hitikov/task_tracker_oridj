@@ -161,6 +161,7 @@ Arij построен по клиент-серверной схеме: Flutter-�
 ## Документация
 
 - [План развития проекта (ROADMAP)](docs/ROADMAP.md)
+- [Доска первого спринта](docs/sprint-1-board.md)
 - [Архитектура](docs/architecture.md)
 - [ADR-0001: серверный стек](docs/adr/0001-backend-stack.md)
 - [OpenAPI 3.1](docs/api/openapi.yaml)
