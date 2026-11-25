@@ -66,8 +66,10 @@ Drift на клиенте — **только локальный кэш**. Он �
 
 ## 3. Слои сервера
 
-Редактируемая UML-диаграмма компонентов — [architecture.puml](architecture.puml).
-Читаемое представление той же структуры — диаграмма Mermaid ниже.
+Редактируемые файлы схемы: [architecture.drawio](architecture.drawio) — модули,
+подписи и связи в виде отдельных элементов draw.io; [architecture.puml](architecture.puml)
+— тот же набор компонентов и связей в виде UML/PlantUML-исходника. Читаемое
+представление структуры — диаграмма Mermaid ниже.
 
 ```mermaid
 flowchart TB
