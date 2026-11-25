@@ -9,7 +9,7 @@
 |---|---|
 | Репозиторий | `Hitikov/task_tracker_oridj`, `main` = `b8e6649`; готовится ветка `release/v2.0.5-security` |
 | Релизы | `v2.0.0` … `v2.0.4` — APK + AAB + Windows zip + `ArijSetup-x64.exe` + `SHA256SUMS.txt`; `v2.0.5+6` готовится с исправлениями аудита |
-| CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` требует HTTPS `API_BASE_URL` и release-подпись Android, E2E больше не пропускаются молча |
+| CI/CD | `lint → test + backend (PostgreSQL service) → build-android + build-windows`; Release по тегу `v*` требует `API_BASE_URL` (`https://<домен>` или `http://<IP>`) и release-подпись Android, E2E больше не пропускаются молча |
 | Тесты | 283 серверных (10 skipped без живой БД) + 97 клиентских, зелёные |
 | Клиент | `ApiClient` (dio), secure storage, Riverpod, экраны входа/проектов, Backlog и Kanban с drag & drop, поиск и фильтры, проверка обновлений, адаптивная вёрстка |
 | Backend | `arij_server`: `/health`, миграции, JWT/Argon2id auth, CRUD проектов/задач, доска и смена статусов |
@@ -309,7 +309,7 @@ Labels: `epic`, `backend`, `db`, `api`, `frontend`, `ci`, `docs`, `bug`, `p1`, `
 | Релизные долги | `applicationId` и release-подпись — до `v2.0.0` |
 | Мало тестов на API | PostgreSQL service в CI + интеграционные тесты с этапа 1 |
 | Уязвимости цепочки обновлений | SHA256 fail-closed, установка только после согласия, обязательная release-подпись |
-| Передача JWT по открытому HTTP | Релиз собирается только с HTTPS `API_BASE_URL`; IP-развёртывание — только для разработки |
+| Передача JWT по открытому HTTP | Preferred HTTPS-домен; для IP допустим HTTP с явным предупреждением и cleartext только для этого адреса в Android |
 | Прошедшие релизы с дефектами | выпуск `v2.0.5` с исправлениями и обновлёнными release notes |
 
 ## 12. Журнал
