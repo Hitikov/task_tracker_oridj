@@ -338,3 +338,53 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 14
+
+  # Этап 3c. Сборка Flutter Web. Выполняется параллельно с Android и Windows.
+  build-web:
+    name: Build Web
+    needs:
+      - test
+      - backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Web release
+        run: flutter build web --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'http://localhost:8080' }}
+
+      - name: Smoke check Web index.html
+        run: |
+          if [ ! -f build/web/index.html ]; then
+            echo "::error::Web-сборка не содержит build/web/index.html"
+            exit 1
+          fi
+          if [ ! -s build/web/index.html ] || ! grep -qi '<html' build/web/index.html; then
+            echo "::error::build/web/index.html пуст или не является HTML"
+            exit 1
+          fi
+          if [ ! -f build/web/flutter_bootstrap.js ] && [ ! -f build/web/main.dart.js ]; then
+            echo "::error::Web-сборка не содержит загрузчик Flutter"
+            exit 1
+          fi
+          echo "Web index.html корректен: $(wc -c < build/web/index.html) байт"
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-release
+          path: build/web/
+          if-no-files-found: error
+          retention-days: 14

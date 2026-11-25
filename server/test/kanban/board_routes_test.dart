@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:arij_server/src/middleware/auth_middleware.dart';
+import 'package:arij_server/src/models/task_status_change.dart';
 import 'package:arij_server/src/models/user.dart';
 import 'package:arij_server/src/routes/board_routes.dart';
 import 'package:arij_server/src/services/board_service.dart';
@@ -8,6 +9,39 @@ import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
 import 'fake_board_repository.dart';
+
+/// [FakeBoardRepository] that keeps status changes in memory, like the SQL
+/// table used by the production repository.
+class RecordingBoardRepository extends FakeBoardRepository {
+  final List<TaskStatusChange> _history = <TaskStatusChange>[];
+  int _nextId = 1;
+
+  @override
+  Future<void> recordStatusChange({
+    required String taskId,
+    required String projectId,
+    required String fromStatusId,
+    required String toStatusId,
+    required String changedBy,
+  }) async {
+    _history.add(
+      TaskStatusChange(
+        id: 'change-${_nextId++}',
+        taskId: taskId,
+        fromStatusId: fromStatusId,
+        toStatusId: toStatusId,
+        changedBy: changedBy,
+        changedAt: DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  @override
+  Future<List<TaskStatusChange>> findStatusHistory(String taskId) async =>
+      List<TaskStatusChange>.unmodifiable(
+        _history.where((change) => change.taskId == taskId),
+      );
+}
 
 void main() {
   const projectId = 'proj-1';
@@ -24,7 +58,7 @@ void main() {
   late BoardRoutes routes;
 
   setUp(() {
-    repository = FakeBoardRepository()
+    repository = RecordingBoardRepository()
       ..seedProject(
         id: projectId,
         key: 'PROJ',
@@ -277,6 +311,141 @@ void main() {
         '/api/v1/tasks/missing-task/status',
         pathParams: <String, String>{'id': 'missing-task'},
         body: const <String, Object?>{'statusId': doneId},
+      );
+      expect(response.statusCode, 401);
+      expect(errorOf(await json(response))['code'], 'unauthorized');
+    });
+  });
+
+  group('GET /api/v1/tasks/<id>/history (getStatusHistory)', () {
+    const List<String> changeKeys = <String>[
+      'id',
+      'taskId',
+      'fromStatusId',
+      'toStatusId',
+      'changedBy',
+      'changedAt',
+    ];
+
+    Future<List<dynamic>> historyFor(String taskId, String userId) async {
+      final response = await send(
+        routes.getStatusHistory,
+        'GET',
+        '/api/v1/tasks/$taskId/history',
+        user: userFor(userId),
+        pathParams: <String, String>{'id': taskId},
+      );
+      expect(response.statusCode, 200);
+      return jsonList(response);
+    }
+
+    test('owner sees the record created by PATCH', () async {
+      final taskId = addTask(id: 'task-1', number: 1, statusId: todoId);
+      final moved = await send(
+        routes.changeStatus,
+        'PATCH',
+        '/api/v1/tasks/$taskId/status',
+        user: userFor(ownerId),
+        pathParams: <String, String>{'id': taskId},
+        body: const <String, Object?>{'statusId': progressId},
+      );
+      expect(moved.statusCode, 200);
+
+      final body = await historyFor(taskId, ownerId);
+      expect(body, hasLength(1));
+      final change = body.single as Map<String, dynamic>;
+      expect(change.keys, unorderedEquals(changeKeys));
+      expect(change['id'], isNotEmpty);
+      expect(change['taskId'], taskId);
+      expect(change['fromStatusId'], todoId);
+      expect(change['toStatusId'], progressId);
+      expect(change['changedBy'], ownerId);
+      expect(DateTime.parse(change['changedAt'] as String), isA<DateTime>());
+    });
+
+    test('member sees all transitions in order', () async {
+      final taskId = addTask(id: 'task-1', number: 1, statusId: todoId);
+      for (final entry in <Map<String, String>>[
+        <String, String>{'user': ownerId, 'status': progressId},
+        <String, String>{'user': memberId, 'status': doneId},
+      ]) {
+        final response = await send(
+          routes.changeStatus,
+          'PATCH',
+          '/api/v1/tasks/$taskId/status',
+          user: userFor(entry['user']!),
+          pathParams: <String, String>{'id': taskId},
+          body: <String, Object?>{'statusId': entry['status']},
+        );
+        expect(response.statusCode, 200);
+      }
+      final body = await historyFor(taskId, memberId);
+      final changes = body.cast<Map<String, dynamic>>();
+      expect(changes.map((change) => change['fromStatusId']), <String>[
+        todoId,
+        progressId,
+      ]);
+      expect(changes.map((change) => change['toStatusId']), <String>[
+        progressId,
+        doneId,
+      ]);
+      expect(changes.map((change) => change['changedBy']), <String>[
+        ownerId,
+        memberId,
+      ]);
+    });
+
+    test('failed PATCH does not add a record', () async {
+      final taskId = addTask(id: 'task-1', number: 1, statusId: todoId);
+      final denied = await send(
+        routes.changeStatus,
+        'PATCH',
+        '/api/v1/tasks/$taskId/status',
+        user: userFor(outsiderId),
+        pathParams: <String, String>{'id': taskId},
+        body: const <String, Object?>{'statusId': doneId},
+      );
+      expect(denied.statusCode, 403);
+      expect(await historyFor(taskId, ownerId), isEmpty);
+    });
+
+    test('non-member → 403 forbidden', () async {
+      final taskId = addTask(id: 'task-1', number: 1, statusId: todoId);
+      final response = await send(
+        routes.getStatusHistory,
+        'GET',
+        '/api/v1/tasks/$taskId/history',
+        user: userFor(outsiderId),
+        pathParams: <String, String>{'id': taskId},
+      );
+      expect(response.statusCode, 403);
+      expect(errorOf(await json(response))['code'], 'forbidden');
+    });
+
+    test('unknown id → 404 task_not_found', () async {
+      const taskId = 'missing-task';
+      final response = await send(
+        routes.getStatusHistory,
+        'GET',
+        '/api/v1/tasks/$taskId/history',
+        user: userFor(ownerId),
+        pathParams: <String, String>{'id': taskId},
+      );
+      expect(response.statusCode, 404);
+      final error = errorOf(await json(response));
+      expect(error['code'], 'task_not_found');
+      expect(error['details'], <String, Object?>{
+        'resource': 'task',
+        'id': taskId,
+      });
+    });
+
+    test('no user in context → 401', () async {
+      final response = await send(
+        routes.getStatusHistory,
+        'GET',
+        '/api/v1/tasks/missing-task/history',
+        pathParams: <String, String>{'id': 'missing-task'},
       );
       expect(response.statusCode, 401);
       expect(errorOf(await json(response))['code'], 'unauthorized');

@@ -45,7 +45,8 @@ info:
     классификация) это разные измерения задачи и не смешиваются.
     Задача получает порядковый `number` в проекте; `key` вычисляется как
     `<key проекта>-<number>`, например `ARIJ-1`. Kanban (этап 3) добавляет
-    `PATCH /tasks/{id}/status` и `GET /projects/{id}/board`.
+    `PATCH /tasks/{id}/status` и `GET /projects/{id}/board`; история переходов
+    статуса доступна через `GET /tasks/{id}/history`.
 
     ## Документы
 
@@ -980,6 +981,53 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/tasks/{id}/history:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Board]
+      summary: История смен статуса задачи
+      description: |
+        Возвращает все зафиксированные переходы статуса задачи в
+        хронологическом порядке, включая повторную установку текущего
+        статуса через `PATCH /tasks/{id}/status`. Доступно владельцу и
+        участникам проекта задачи. Неизвестная задача — `404 task_not_found`,
+        пользователь не из проекта — `403 forbidden`.
+      operationId: getTaskStatusHistory
+      responses:
+        '200':
+          description: Записи истории смены статуса
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskStatusChange'
+              examples:
+                history:
+                  summary: Два перехода задачи
+                  value:
+                    - id: 77777777-8888-4999-aaaa-000000000001
+                      taskId: 11111111-2222-4333-8444-555555555556
+                      fromStatusId: 66666666-7777-4888-9999-000000000002
+                      toStatusId: 66666666-7777-4888-9999-000000000005
+                      changedBy: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      changedAt: '2026-12-06T12:00:00.000Z'
+                    - id: 77777777-8888-4999-aaaa-000000000002
+                      taskId: 11111111-2222-4333-8444-555555555556
+                      fromStatusId: 66666666-7777-4888-9999-000000000005
+                      toStatusId: 66666666-7777-4888-9999-000000000006
+                      changedBy: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      changedAt: '2026-12-07T09:30:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/v1/projects/{id}/task-types:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -1841,3 +1889,45 @@ components:
           description: Задачи колонки, отсортированные по `number`
           items:
             $ref: '#/components/schemas/Task'
+
+    TaskStatusChange:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - taskId
+        - fromStatusId
+        - toStatusId
+        - changedBy
+        - changedAt
+      description: Одна запись истории перехода статуса задачи.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        taskId:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Задача, чей статус изменён
+        fromStatusId:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Статус до изменения
+        toStatusId:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Статус после изменения
+        changedBy:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Пользователь, изменивший статус
+        changedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Время фиксации изменения

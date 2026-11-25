@@ -77,11 +77,15 @@ if [[ "$SCHEME" == "https" ]]; then
 fi
 "$DK" compose "${COMPOSE_ARGS[@]}" up -d --build
 
+DB_NAME_OUT="$(grep '^DB_NAME=' .env | cut -d= -f2- || true)"
+DB_USER_OUT="$(grep '^DB_USER=' .env | cut -d= -f2- || true)"
+
 echo ""
 echo "Готово:"
 echo "  API:   $API_BASE/health"
 echo "  Web:   $API_BASE/  (если собран deploy/www)"
 echo "  Логи:  $DK compose ${COMPOSE_ARGS[*]} logs -f"
+echo "  Бэкап: $DK compose ${COMPOSE_ARGS[*]} exec -T postgres pg_dump -Fc -U ${DB_USER_OUT:-arij} ${DB_NAME_OUT:-arij} > arij-\$(date +%F).dump"
 if [[ "$SCHEME" == "http" ]]; then
   echo "" >&2
   echo "ВНИМАНИЕ: развёртывание по IP работает по HTTP: JWT передаётся без TLS." >&2

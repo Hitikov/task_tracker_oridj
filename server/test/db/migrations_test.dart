@@ -12,6 +12,7 @@ void main() {
     '0004_task_enums.sql',
     '0005_task_types_statuses.sql',
     '0006_tasks.sql',
+    '0007_task_status_history.sql',
   ];
 
   group('миграции (server/migrations)', () {

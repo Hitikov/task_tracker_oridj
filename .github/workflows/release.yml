@@ -304,6 +304,19 @@ jobs:
             "dist/${APP_NAME}-${version}-android.aab"
           ls -lh dist
 
+      - name: Smoke check Android artifacts
+        run: |
+          version="${{ needs.lint.outputs.version }}"
+          for name in \
+            "${APP_NAME}-${version}-android.apk" \
+            "${APP_NAME}-${version}-android.aab"; do
+            if [ ! -s "dist/$name" ]; then
+              echo "::error::Отсутствует или пуст артефакт: $name"
+              exit 1
+            fi
+          done
+          echo "APK и AAB присутствуют и не пусты"
+
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -390,10 +403,98 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
           Get-ChildItem dist | Select-Object Name, Length
 
+      - name: Smoke check Windows artifacts
+        shell: pwsh
+        run: |
+          $version = "${{ needs.lint.outputs.version }}"
+          $expected = @(
+            "${env:APP_NAME}-${version}-windows-x64.zip",
+            "ArijSetup-${version}-x64.exe"
+          )
+          foreach ($name in $expected) {
+            $path = Join-Path "dist" $name
+            if (-not (Test-Path $path) -or (Get-Item $path).Length -eq 0) {
+              throw "Отсутствует или пуст артефакт: $name"
+            }
+          }
+          Write-Host "Windows-артефакты (zip и exe) присутствуют и не пусты"
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v7
         with:
           name: windows-release
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # Этап 3c. Сборка Flutter Web с тем же проверенным API_BASE_URL, что и остальные сборки.
+  build-web:
+    name: Build Web
+    needs:
+      - lint
+      - test
+      - backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Validate API base URL
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          case "$API_BASE_URL" in
+            https://*) ;;
+            http://[0-9]*.[0-9]*.[0-9]*.[0-9]*)
+              echo "::warning::Релиз по IP использует открытый HTTP: JWT передаётся без TLS" ;;
+            *) echo "::error::API_BASE_URL должен быть https://<домен> или http://<IP>" ; exit 1 ;;
+          esac
+
+      - name: Build Web release
+        run: flutter build web --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+
+      - name: Smoke check Web index.html
+        run: |
+          if [ ! -f build/web/index.html ]; then
+            echo "::error::Web-сборка не содержит build/web/index.html"
+            exit 1
+          fi
+          if [ ! -s build/web/index.html ] || ! grep -qi '<html' build/web/index.html; then
+            echo "::error::build/web/index.html пуст или не является HTML"
+            exit 1
+          fi
+          if [ ! -f build/web/flutter_bootstrap.js ] && [ ! -f build/web/main.dart.js ]; then
+            echo "::error::Web-сборка не содержит загрузчик Flutter"
+            exit 1
+          fi
+          echo "Web index.html корректен: $(wc -c < build/web/index.html) байт"
+
+      - name: Package Web artifact
+        run: |
+          mkdir -p dist
+          version="${{ needs.lint.outputs.version }}"
+          name="${APP_NAME}-${version}-web.zip"
+          (cd build/web && zip -qr "$OLDPWD/dist/$name" .)
+          ls -lh "dist/$name"
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-release
           path: dist/*
           if-no-files-found: error
           retention-days: 7
@@ -405,6 +506,7 @@ jobs:
       - lint
       - build-android
       - build-windows
+      - build-web
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 10
@@ -424,12 +526,59 @@ jobs:
           name: windows-release
           path: dist
 
+      - name: Download Web artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: web-release
+          path: dist
+
+      - name: Smoke check release artifacts
+        run: |
+          version="${{ needs.lint.outputs.version }}"
+          expected=(
+            "${APP_NAME}-${version}-android.apk"
+            "${APP_NAME}-${version}-android.aab"
+            "${APP_NAME}-${version}-windows-x64.zip"
+            "ArijSetup-${version}-x64.exe"
+            "${APP_NAME}-${version}-web.zip"
+          )
+          for name in "${expected[@]}"; do
+            if [ ! -s "dist/$name" ]; then
+              echo "::error::Отсутствует или пуст артефакт релиза: $name"
+              exit 1
+            fi
+          done
+          if ! unzip -l "dist/${APP_NAME}-${version}-web.zip" | grep -q 'index.html'; then
+            echo "::error::Web-артефакт не содержит index.html"
+            exit 1
+          fi
+          echo "APK, AAB, zip, exe и web index.html присутствуют"
+
       - name: Build checksums
         run: |
           cd dist
           rm -f SHA256SUMS.txt
           sha256sum *.apk *.aab *.zip *.exe > SHA256SUMS.txt
           cat SHA256SUMS.txt
+
+      - name: Verify checksums cover all artifacts
+        run: |
+          version="${{ needs.lint.outputs.version }}"
+          cd dist
+          expected=(
+            "${APP_NAME}-${version}-android.apk"
+            "${APP_NAME}-${version}-android.aab"
+            "${APP_NAME}-${version}-windows-x64.zip"
+            "ArijSetup-${version}-x64.exe"
+            "${APP_NAME}-${version}-web.zip"
+          )
+          for name in "${expected[@]}"; do
+            if ! grep -Fq "  $name" SHA256SUMS.txt; then
+              echo "::error::SHA256SUMS.txt не содержит $name"
+              exit 1
+            fi
+          done
+          sha256sum -c SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -439,7 +588,7 @@ jobs:
           body: |
             ## Arij ${{ needs.lint.outputs.version }}
 
-            Сборки для Android и Windows (x64).
+            Сборки для Android, Windows (x64) и Web.
 
             ### Android
 
@@ -458,6 +607,14 @@ jobs:
             3. `task_tracker_oridj-${{ needs.lint.outputs.version }}-windows-x64.zip` — портативная версия без установки.
 
             > Сборка не подписана. Windows SmartScreen может показать предупреждение — выберите «Подробнее» → «Выполнить в любом случае».
+
+            ### Web
+
+            `task_tracker_oridj-${{ needs.lint.outputs.version }}-web.zip` —
+            статическая сборка Flutter Web. Распакуйте архив на любом статическом
+            хостинге или за Caddy (`deploy/`). Адрес API вшит в сборку через
+            `--dart-define=API_BASE_URL` и совпадает с адресом мобильных и
+            десктопных сборок.
 
             ### Вход
 
@@ -479,7 +636,8 @@ jobs:
           files: |
             dist/*.apk
             dist/*.aab
-            dist/*.zip
+            dist/*-windows-x64.zip
+            dist/*-web.zip
             dist/*.exe
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true

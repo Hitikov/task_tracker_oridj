@@ -157,6 +157,27 @@ class ApiClient {
   Future<List<Map<String, dynamic>>> getProjectMembers(String projectId) =>
       getList('/api/v1/projects/$projectId/members');
 
+  /// `POST /api/v1/projects/{projectId}/members` (owner only).
+  Future<Map<String, dynamic>> addProjectMember(
+    String projectId, {
+    required String email,
+    String? role,
+  }) {
+    return post(
+      '/api/v1/projects/$projectId/members',
+      body: <String, dynamic>{'email': email, if (role != null) 'role': role},
+    );
+  }
+
+  /// `DELETE /api/v1/projects/{projectId}/members/{userId}` (owner only).
+  Future<void> removeProjectMember(String projectId, String userId) async {
+    await delete('/api/v1/projects/$projectId/members/$userId');
+  }
+
+  /// `GET /api/v1/tasks/{taskId}/history` — история смены статусов.
+  Future<List<Map<String, dynamic>>> getTaskHistory(String taskId) =>
+      getList('/api/v1/tasks/$taskId/history');
+
   /// `GET /api/v1/projects/{projectId}/board`.
   ///
   /// Возвращает колонки доски: `[{status: Status, tasks: Task[]}]`.

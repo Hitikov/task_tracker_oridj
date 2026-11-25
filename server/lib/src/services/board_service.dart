@@ -1,5 +1,6 @@
 import '../models/status.dart';
 import '../models/task.dart';
+import '../models/task_status_change.dart';
 import '../repositories/board_repository.dart';
 import 'project_service.dart'
     show ForbiddenException, NotFoundException, ValidationException;
@@ -39,7 +40,9 @@ class BoardService {
   /// Unknown task → `task_not_found` (404), missing project →
   /// `project_not_found` (404), non-member → `forbidden` (403), empty or
   /// foreign `statusId` → `validation_error` (400). Returns the updated task.
-  /// Moving a task into its current status is allowed and is a no-op.
+  /// Moving a task into its current status is allowed and is a no-op for the
+  /// task itself; like every successful call it is recorded in the history
+  /// with equal `fromStatusId` and `toStatusId`.
   Future<Task> changeStatus({
     required String userId,
     required String taskId,
@@ -63,7 +66,31 @@ class BoardService {
     if (updated == null) {
       throw _taskNotFound(taskId);
     }
+    await repository.recordStatusChange(
+      taskId: taskId,
+      projectId: task.projectId,
+      fromStatusId: task.statusId,
+      toStatusId: status.id,
+      changedBy: userId,
+    );
     return updated;
+  }
+
+  /// Status-change history of a task (`GET /tasks/{id}/history`).
+  ///
+  /// Unknown task → `task_not_found` (404), missing project →
+  /// `project_not_found` (404), non-member → `forbidden` (403). Returns the
+  /// recorded transitions in chronological order.
+  Future<List<TaskStatusChange>> getStatusHistory({
+    required String userId,
+    required String taskId,
+  }) async {
+    final task = await repository.findTaskById(taskId);
+    if (task == null) {
+      throw _taskNotFound(taskId);
+    }
+    await _ensureAccess(userId, task.projectId);
+    return repository.findStatusHistory(taskId);
   }
 
   /// Board data for a project (`GET /projects/{id}/board`).
