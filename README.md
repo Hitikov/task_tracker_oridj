@@ -151,6 +151,13 @@ docs/                ROADMAP, MVP, архитектура, API, демо-сце�
 .github/workflows/   CI/CD: lint, test, сборки и релиз
 ```
 
+## Архитектура проекта
+
+Arij построен по клиент-серверной схеме: Flutter-клиент обращается к серверу на Dart
+(`shelf`) через REST API `/api/v1`, данные хранятся в PostgreSQL. Сервер разделён на
+слои `routes → services → repositories → db`. Полное описание, редактируемая UML-схема
+и обоснование решений — в [docs/architecture.md](docs/architecture.md).
+
 ## Документация
 
 - [План развития проекта (ROADMAP)](docs/ROADMAP.md)

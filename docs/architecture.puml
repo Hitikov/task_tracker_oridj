@@ -1,0 +1,21 @@
+@startuml
+title Arij — компоненты и взаимодействия
+
+component "Flutter Client\nUI, ApiClient, Riverpod" as Client
+component "Arij Server\nroutes → services → repositories → db" as Server
+database "PostgreSQL 16" as DB
+component "Caddy\nстатический Web + reverse proxy" as Caddy
+actor "Пользователь" as User
+
+User --> Client : использует
+Client --> Caddy : HTTPS / HTTP (API_BASE_URL)
+Caddy --> Server : /api/v1, /health
+Server --> DB : SQL (postgres, пул соединений)
+
+note right of Server
+  JWT/Argon2id, REST JSON,
+  единый конверт ошибок,
+  миграции при старте
+end note
+
+@enduml
